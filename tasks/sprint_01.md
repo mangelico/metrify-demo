@@ -2,7 +2,7 @@
 **Semanas:** 1-2 | **GitHub Project column:** Sprint 01  
 **Objetivo:** Repo funcionando, Postgres conectado, primer endpoint vivo en Railway. Al final de este sprint el gateway existe y despliega sin explotar.
 
-**Estado general:** `[ ]` No iniciado
+**Estado general:** `[~]` En progreso — código completo, TASK-05 pendiente de activación en Railway UI
 
 ---
 
@@ -10,8 +10,9 @@
 
 ### TASK-01 · Inicializar repo y estructura de proyecto
 **Issue GitHub:** #1  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** `git push` exitoso, estructura de carpetas en su lugar, CI no explota.
+**Commit:** `78b1484` — `chore: init project structure (closes #1)`
 
 ```
 modelo-gateway/
@@ -42,8 +43,9 @@ modelo-gateway/
 
 ### TASK-02 · Configuración de entorno y settings
 **Issue GitHub:** #2  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** `src/config.py` lee todas las variables de entorno listadas en CLAUDE.md. `.env.example` completo. `python-dotenv` instalado.
+**Commit:** `9267eec` — `feat: environment config with pydantic-settings (closes #2)`
 
 Usar `pydantic-settings` para Settings class:
 ```python
@@ -67,8 +69,9 @@ class Settings(BaseSettings):
 
 ### TASK-03 · Modelos de base de datos (SQLAlchemy async)
 **Issue GitHub:** #3  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** Tablas `wallets` y `transactions` definidas con SQLAlchemy async. Alembic configurado. Primera migración generada y aplicable.
+**Commit:** `1bff40c` — `feat: database models and first alembic migration (closes #3)`
 
 Usar el esquema exacto de CLAUDE.md. Puntos clave:
 - `balance_usdt` como `Numeric(18, 6)` — nunca float
@@ -83,8 +86,9 @@ Usar el esquema exacto de CLAUDE.md. Puntos clave:
 
 ### TASK-04 · Endpoint /health y app base
 **Issue GitHub:** #4  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** `GET /health` devuelve `{"status": "ok", "db": "connected", "version": "0.1.0"}`. Tests pasan. App corre localmente con `uvicorn src.main:app`.
+**Commit:** `a44b734` — `feat: health endpoint with db connectivity check (closes #4)`
 
 ```python
 # respuesta esperada
@@ -96,6 +100,8 @@ Usar el esquema exacto de CLAUDE.md. Puntos clave:
 }
 ```
 
+Tests: 2/2 pasando (happy path + DB disconnected error path).
+
 **Dependencias:** TASK-03  
 **Commit esperado:** `feat: health endpoint with db connectivity check`
 
@@ -103,15 +109,16 @@ Usar el esquema exacto de CLAUDE.md. Puntos clave:
 
 ### TASK-05 · Deploy en Railway
 **Issue GitHub:** #5  
-**Estado:** `[ ]`  
+**Estado:** `[~]`  
 **Criterio de done:** App desplegada en Railway. `/health` accesible via URL pública. PostgreSQL provisioned en Railway y conectado. Variables de entorno configuradas en Railway dashboard.
+**Commit:** `36eb4bc` — `chore: add Procfile and railway.json for Railway deploy (closes #5)`
 
-Pasos:
-1. Crear proyecto en Railway desde el repo de GitHub
+Pasos pendientes (requieren acción manual del founder):
+1. Crear proyecto en Railway desde el repo de GitHub (`mangelico/modelo-gateway`)
 2. Agregar PostgreSQL plugin
 3. Configurar todas las env vars de `.env.example`
 4. Verificar que `/health` responde `{"db": "connected"}` en la URL pública
-5. Configurar auto-deploy desde rama `main`
+5. Auto-deploy desde rama `main` ya configurado por Railway por defecto
 
 **Dependencias:** TASK-04  
 **Commit esperado:** `chore: add railway.json / Procfile if needed`
@@ -136,11 +143,11 @@ Columnas del tablero:
 
 ## Definición de "Sprint 01 completo"
 
-- [ ] Repo en GitHub con estructura correcta
-- [ ] `GET /health` responde con DB conectada
-- [ ] Deploy funcionando en Railway con URL pública
-- [ ] Alembic migrations aplicadas en Railway
-- [ ] GitHub Project con todos los issues cargados
-- [ ] Tests del health endpoint pasando en CI
+- [x] Repo en GitHub con estructura correcta
+- [x] `GET /health` responde con DB conectada (localmente con mock)
+- [ ] Deploy funcionando en Railway con URL pública ← pendiente acción manual
+- [ ] Alembic migrations aplicadas en Railway ← pendiente deploy
+- [ ] GitHub Project con todos los issues cargados ← pendiente acción manual
+- [x] Tests del health endpoint pasando (2/2)
 
 **Al completar:** Mover todos los issues a "Done" y comentar en cada uno el commit correspondiente. Luego leer `tasks/sprint_02.md`.
