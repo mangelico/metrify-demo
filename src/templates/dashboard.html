@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modelo Gateway — Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 2rem; }
+    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.5rem; color: #fff; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.25rem; }
+    .card .label { font-size: 0.75rem; color: #888; margin-bottom: 0.35rem; }
+    .card .value { font-size: 1.5rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+    .card .value.usdt { color: #4ade80; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.5rem 0.75rem; color: #666; font-weight: 500; border-bottom: 1px solid #2a2a2a; }
+    td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; font-variant-numeric: tabular-nums; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+    .badge-completed { background: #052e16; color: #4ade80; }
+    .badge-upstream_error { background: #450a0a; color: #f87171; }
+    .badge-insufficient_balance { background: #431407; color: #fb923c; }
+    .badge-pending { background: #1e1b4b; color: #818cf8; }
+    .mono { font-family: monospace; font-size: 0.8rem; color: #888; }
+    .section { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.25rem; margin-bottom: 2rem; }
+    .tool-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #222; }
+    .tool-row:last-child { border-bottom: none; }
+    .empty { color: #555; font-size: 0.85rem; padding: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Modelo Gateway</h1>
+
+  <!-- Summary cards -->
+  <div class="grid">
+    <div class="card">
+      <div class="label">Total Wallets</div>
+      <div class="value">{{ stats.wallet_count }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Balance (USDT)</div>
+      <div class="value usdt">{{ "%.4f"|format(stats.total_balance) }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Transactions (all time)</div>
+      <div class="value">{{ stats.tx_count }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Fees Collected (USDT)</div>
+      <div class="value usdt">{{ "%.6f"|format(stats.total_fees) }}</div>
+    </div>
+  </div>
+
+  <!-- Per-tool breakdown -->
+  <h2>Tool usage</h2>
+  <div class="section" style="margin-bottom:2rem">
+    {% if tool_stats %}
+      {% for row in tool_stats %}
+        <div class="tool-row">
+          <span>{{ row.tool }}</span>
+          <span>{{ row.count }} calls &nbsp;·&nbsp; <span style="color:#4ade80">{{ "%.6f"|format(row.total_cost) }} USDT</span></span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">No transactions yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Recent transactions -->
+  <h2>Last 20 transactions</h2>
+  <div class="section">
+    {% if transactions %}
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tool</th>
+            <th>Status</th>
+            <th>Cost (USDT)</th>
+            <th>Fee (USDT)</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr>
+            <td class="mono">{{ tx.id | string | truncate(8, True, '') }}…</td>
+            <td>{{ tx.tool }}</td>
+            <td><span class="badge badge-{{ tx.status.value }}">{{ tx.status.value }}</span></td>
+            <td>{{ "%.6f"|format(tx.upstream_cost) }}</td>
+            <td>{{ "%.6f"|format(tx.fee_5pct) }}</td>
+            <td class="mono">{{ tx.created_at.strftime("%Y-%m-%d %H:%M") if tx.created_at else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty">No transactions yet.</div>
+    {% endif %}
+  </div>
+</body>
+</html>
