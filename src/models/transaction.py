@@ -1,8 +1,9 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import DateTime, Enum, Index, Numeric, String, Text, func
+from sqlalchemy import DateTime, Enum, Index, Numeric, String, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,8 +34,8 @@ class Transaction(Base):
         Enum(TransactionStatus), nullable=False, default=TransactionStatus.pending
     )
     idempotency_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    request_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    response_meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    request_payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    response_meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
