@@ -165,3 +165,41 @@ async def test_topup_wrong_admin_token():
         assert resp.status_code == 401
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_create_wallet_missing_admin_token():
+    db = _make_db()
+
+    async def override():
+        yield db
+
+    app.dependency_overrides[get_db] = override
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/wallets", json={"agent_id": "agent_x"})
+        assert resp.status_code == 401
+        assert resp.json()["detail"]["error"] == "invalid_admin_token"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_create_wallet_wrong_admin_token():
+    db = _make_db()
+
+    async def override():
+        yield db
+
+    app.dependency_overrides[get_db] = override
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                "/wallets",
+                json={"agent_id": "agent_x"},
+                headers={"X-Admin-Token": "wrong-token"},
+            )
+        assert resp.status_code == 401
+        assert resp.json()["detail"]["error"] == "invalid_admin_token"
+    finally:
+        app.dependency_overrides.clear()
