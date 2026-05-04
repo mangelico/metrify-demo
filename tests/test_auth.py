@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from src.auth import generate_raw_key, hash_key, require_api_key
+from src.auth import generate_raw_key, hash_key, require_admin_token, require_api_key
 from src.models.api_key import ApiKey
 from src.models.wallet import Wallet
 
@@ -60,6 +60,19 @@ async def test_require_api_key_invalid_returns_401():
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == {"error": "invalid_api_key"}
+
+
+@pytest.mark.asyncio
+async def test_require_admin_token_valid():
+    await require_admin_token(x_admin_token="test-admin-token")
+
+
+@pytest.mark.asyncio
+async def test_require_admin_token_invalid():
+    with pytest.raises(HTTPException) as exc_info:
+        await require_admin_token(x_admin_token="wrong-token")
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == {"error": "invalid_admin_token"}
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     apify_api_token: str = ""
     platform_fee_pct: float = 0.05
     secret_key: str
+    admin_token: str
 
     model_config = SettingsConfigDict(env_file=".env")
 

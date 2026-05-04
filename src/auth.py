@@ -1,15 +1,24 @@
 import hashlib
 import secrets
+from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.database import get_db
 from src.models.api_key import ApiKey
 from src.models.wallet import Wallet
 
 _KEY_PREFIX = "mk_live_"
+
+
+async def require_admin_token(
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
+) -> None:
+    if x_admin_token != settings.admin_token:
+        raise HTTPException(status_code=401, detail={"error": "invalid_admin_token"})
 
 
 def generate_raw_key() -> str:

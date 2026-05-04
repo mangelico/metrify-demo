@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import require_admin_token
 from src.database import get_db
 from src.models.wallet import Wallet
 
@@ -36,7 +37,7 @@ class TopupResponse(BaseModel):
     balance_usdt: Decimal
 
 
-@router.post("", response_model=WalletResponse, status_code=201)
+@router.post("", response_model=WalletResponse, status_code=201, dependencies=[Depends(require_admin_token)])
 async def create_wallet(
     body: CreateWalletRequest,
     db: AsyncSession = Depends(get_db),
@@ -63,7 +64,7 @@ async def get_wallet(
     return WalletResponse.model_validate(wallet)
 
 
-@router.post("/{wallet_id}/topup", response_model=TopupResponse)
+@router.post("/{wallet_id}/topup", response_model=TopupResponse, dependencies=[Depends(require_admin_token)])
 async def topup_wallet(
     wallet_id: uuid.UUID,
     body: TopupRequest,

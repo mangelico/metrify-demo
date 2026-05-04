@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth import generate_raw_key, hash_key
+from src.auth import generate_raw_key, hash_key, require_admin_token
 from src.database import get_db
 from src.models.api_key import ApiKey
 from src.models.wallet import Wallet
@@ -26,7 +26,7 @@ class CreateKeyResponse(BaseModel):
     label: Optional[str]
 
 
-@router.post("", response_model=CreateKeyResponse, status_code=201)
+@router.post("", response_model=CreateKeyResponse, status_code=201, dependencies=[Depends(require_admin_token)])
 async def create_api_key(
     body: CreateKeyRequest,
     db: AsyncSession = Depends(get_db),

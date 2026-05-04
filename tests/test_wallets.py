@@ -77,7 +77,9 @@ async def test_topup_wallet_happy():
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
-                f"/wallets/{wallet.id}/topup", json={"amount": "5.5"}
+                f"/wallets/{wallet.id}/topup",
+                json={"amount": "5.5"},
+                headers={"X-Admin-Token": "test-admin-token"},
             )
         assert resp.status_code == 200
         data = resp.json()
@@ -98,7 +100,9 @@ async def test_topup_wallet_not_found():
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
-                f"/wallets/{uuid.uuid4()}/topup", json={"amount": "10"}
+                f"/wallets/{uuid.uuid4()}/topup",
+                json={"amount": "10"},
+                headers={"X-Admin-Token": "test-admin-token"},
             )
         assert resp.status_code == 404
     finally:
@@ -116,8 +120,48 @@ async def test_topup_invalid_amount():
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
-                f"/wallets/{uuid.uuid4()}/topup", json={"amount": "-1"}
+                f"/wallets/{uuid.uuid4()}/topup",
+                json={"amount": "-1"},
+                headers={"X-Admin-Token": "test-admin-token"},
             )
         assert resp.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_topup_missing_admin_token():
+    db = _make_db()
+
+    async def override():
+        yield db
+
+    app.dependency_overrides[get_db] = override
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                f"/wallets/{uuid.uuid4()}/topup", json={"amount": "10"}
+            )
+        assert resp.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_topup_wrong_admin_token():
+    db = _make_db()
+
+    async def override():
+        yield db
+
+    app.dependency_overrides[get_db] = override
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                f"/wallets/{uuid.uuid4()}/topup",
+                json={"amount": "10"},
+                headers={"X-Admin-Token": "wrong-token"},
+            )
+        assert resp.status_code == 401
     finally:
         app.dependency_overrides.clear()
