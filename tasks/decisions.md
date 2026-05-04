@@ -36,3 +36,7 @@
 ## DEC-008 — Auth con API keys propias (no OAuth/JWT)
 **Fecha:** Abril 2026  
 **Razón:** Suficiente para V1. Los early adopters son developers que están cómodos con API keys. OAuth agrega complejidad sin valor en esta etapa.
+
+## DEC-009 — Rate limiting con slowapi in-memory (no Redis)
+**Fecha:** Mayo 2026 — TASK-16  
+**Razón:** Redis agrega complejidad innecesaria en V1 con una sola instancia. slowapi in-memory es suficiente para el volumen actual. Revisitar cuando haya múltiples instancias o usuarios reales.

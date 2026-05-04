@@ -160,3 +160,4 @@ Cada tarea del sprint tiene un issue de GitHub asociado. El agente debe:
 - ❌ No agregar Browserbase en C1 — Apify cubre el mismo caso de uso
 - ❌ No implementar token nativo — USDT simulado en Postgres V1
 - ❌ No optimizar performance antes de tener el flujo completo funcionando
+- ❌ No usar Redis para rate limiting en V1 — slowapi in-memory es suficiente
