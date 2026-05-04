@@ -22,7 +22,7 @@ Tagline: *"The payment layer every MCP server will need — before they know the
 | Gateway API | Python 3.11 + FastAPI | Stack principal del founder |
 | MCP wrappers | FastMCP | SDK oficial MCP en Python |
 | Base de datos | PostgreSQL en Railway | Wallets + transactions + audit |
-| Hosting | Railway | Deploy desde GitHub, zero config |
+| Hosting | Railway | Deploy desde GitHub, zero config | https://web-production-b51ff.up.railway.app |
 | Settlement V1 | Postgres (simulado) | Valida flujo sin Solidity |
 | Settlement V2 | web3.py + Polygon | Post-validación del flujo |
 | Dashboard | FastAPI + Jinja2 | Simple, sin frontend framework |
@@ -75,6 +75,7 @@ Si la upstream API falla después de procesar parte del request:
 -- wallets
 id, agent_id (unique), master_id, balance_usdt (decimal 18,6),
 created_at, updated_at
+-- top-up V1: POST /wallets/{id}/topup — suma balance directo en Postgres, sin crypto real
 
 -- transactions  
 id, wallet_id (FK), tool, upstream_cost, fee_5pct, total_cost,
@@ -89,8 +90,8 @@ created_at
 
 | # | Tool | Unidad de cobro | Sem. objetivo |
 |---|---|---|---|
-| 1 | Anthropic API | per-token (input+output) | 1-2 |
-| 2 | OpenAI API | per-token (input+output) | 2-3 |
+| 1 | Anthropic API | per-token (input+output) | 1-2 | claude-haiku-4-5 |
+| 2 | OpenAI API | per-token (input+output) | 2-3 | gpt-4o-mini |
 | 3 | Stability AI | per-image | 3 |
 | 4 | AssemblyAI | per-minute (audio) | 4 |
 | 5 | Apify | per-run (async) | 5 |
