@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     assemblyai_api_key: str = ""
     apify_api_token: str = ""
     platform_fee_pct: float = 0.05
+    rate_limit_per_minute: int = 60
     secret_key: str
     admin_token: str
 

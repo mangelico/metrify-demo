@@ -104,8 +104,13 @@ async def test_mcp_call_unknown_tool():
                 "/mcp/call",
                 json={"tool": "nonexistent", "params": {}},
             )
-        assert resp.status_code == 400
-        assert resp.json()["detail"]["error"] == "unknown_tool"
+        assert resp.status_code == 404
+        detail = resp.json()["detail"]
+        assert detail["error"] == "tool_not_found"
+        assert "available_tools" in detail
+        assert "anthropic" in detail["available_tools"]
+        assert "openai" in detail["available_tools"]
+        assert "stability" in detail["available_tools"]
     finally:
         app.dependency_overrides.clear()
 
@@ -185,3 +190,91 @@ def _make_mock_wrapper(estimate: Decimal, result):
     w.estimate_cost = AsyncMock(return_value=estimate)
     w.call = AsyncMock(return_value=result)
     return w
+
+
+_OPENAI_RESULT = {
+    "id": "chatcmpl-001",
+    "model": "gpt-4o-mini",
+    "content": [{"type": "text", "text": "Hello!"}],
+    "usage": {"input_tokens": 10, "output_tokens": 5},
+    "finish_reason": "stop",
+}
+
+_STABILITY_RESULT = {
+    "model": "sdxl",
+    "image_b64": "abc123==",
+    "finish_reason": "SUCCESS",
+}
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_routes_to_openai():
+    wallet = _mock_wallet()
+    tx = _mock_tx()
+
+    async def db_override():
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=wallet)
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result_mock)
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock(side_effect=lambda obj: setattr(obj, "id", tx.id) or None)
+        yield db
+
+    app.dependency_overrides[get_db] = db_override
+    app.dependency_overrides[require_api_key] = lambda: wallet
+
+    try:
+        with patch(
+            "src.routers.mcp._WRAPPERS",
+            {"openai": _make_mock_wrapper(Decimal("0.001"), (_OPENAI_RESULT, Decimal("0.0005")))},
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post(
+                    "/mcp/call",
+                    json={
+                        "tool": "openai",
+                        "params": {"messages": [{"role": "user", "content": "Hi"}], "max_tokens": 10},
+                    },
+                )
+        assert resp.status_code == 200
+        assert resp.json()["result"]["model"] == "gpt-4o-mini"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_routes_to_stability():
+    wallet = _mock_wallet()
+    tx = _mock_tx()
+
+    async def db_override():
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=wallet)
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result_mock)
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock(side_effect=lambda obj: setattr(obj, "id", tx.id) or None)
+        yield db
+
+    app.dependency_overrides[get_db] = db_override
+    app.dependency_overrides[require_api_key] = lambda: wallet
+
+    try:
+        with patch(
+            "src.routers.mcp._WRAPPERS",
+            {"stability": _make_mock_wrapper(Decimal("0.002"), (_STABILITY_RESULT, Decimal("0.002")))},
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post(
+                    "/mcp/call",
+                    json={"tool": "stability", "params": {"prompt": "a cat", "model": "sdxl"}},
+                )
+        assert resp.status_code == 200
+        assert resp.json()["result"]["model"] == "sdxl"
+    finally:
+        app.dependency_overrides.clear()

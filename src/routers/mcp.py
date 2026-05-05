@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,16 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth import require_api_key
 from src.config import settings
 from src.database import get_db
+from src.limiter import limiter
 from src.models.transaction import TransactionStatus
 from src.models.wallet import Wallet
 from src.services.metering import InsufficientBalanceError, MeteringService
 from src.wrappers.anthropic_wrapper import AnthropicWrapper
+from src.wrappers.openai_wrapper import OpenAIWrapper
+from src.wrappers.stability_wrapper import StabilityWrapper
 from src.wrappers.base import UpstreamError
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 _WRAPPERS = {
     "anthropic": AnthropicWrapper(),
+    "openai": OpenAIWrapper(),
+    "stability": StabilityWrapper(),
 }
 
 
@@ -29,15 +34,28 @@ class MCPCallRequest(BaseModel):
     idempotency_key: Optional[str] = None
 
 
+def _rate_limit() -> str:
+    return f"{settings.rate_limit_per_minute}/minute"
+
+
 @router.post("/call")
+@limiter.limit(_rate_limit)
 async def mcp_call(
+    request: Request,
     body: MCPCallRequest,
     wallet: Wallet = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     wrapper = _WRAPPERS.get(body.tool)
     if wrapper is None:
-        raise HTTPException(status_code=400, detail={"error": "unknown_tool", "tool": body.tool})
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "tool_not_found",
+                "tool": body.tool,
+                "available_tools": list(_WRAPPERS.keys()),
+            },
+        )
 
     idempotency_key = body.idempotency_key or str(uuid.uuid4())
     metering = MeteringService(db)
@@ -87,7 +105,6 @@ async def mcp_call(
             response_meta={"usage": result.get("usage")},
         )
     except InsufficientBalanceError:
-        # Race condition: balance dropped between check and debit
         raise HTTPException(status_code=402, detail={"error": "insufficient_balance"})
 
     remaining = await metering.get_balance(wallet.id)
