@@ -9,7 +9,7 @@
 ## Tareas
 
 ### TASK-17 · AssemblyAI wrapper (per-minute audio)
-**Issue GitHub:** #17  
+**Issue GitHub:** #18  
 **Estado:** `[ ]`  
 **Criterio de done:** `AssemblyAIWrapper(BaseMCPWrapper)`. Costo por minuto de audio transcripto. El "uso real" se extrae de la metadata de respuesta (duración del audio procesado). Tests con mock.  
 **Commit:** `feat: assemblyai wrapper (per-minute billing)`
@@ -17,7 +17,7 @@
 ---
 
 ### TASK-18 · Apify wrapper (per-run async)
-**Issue GitHub:** #18  
+**Issue GitHub:** #19  
 **Estado:** `[ ]`  
 **Criterio de done:** `ApifyWrapper(BaseMCPWrapper)`. Maneja el patrón async: inicia run → polling de status → resultado. El costo se calcula cuando el run completa (no al inicio). Si el run falla → no charge. Tests con mock del ciclo async.  
 **Commit:** `feat: apify wrapper (async per-run billing)`
@@ -35,7 +35,7 @@ en markdown limpio. Tests con mock.
 ---
 
 ### TASK-19 · Error handling y logging estructurado
-**Issue GitHub:** #19  
+**Issue GitHub:** #20  
 **Estado:** `[ ]`  
 **Criterio de done:** Todos los errores devuelven JSON estructurado `{"error": "code", "message": "...", "request_id": "..."}`. Logging con `structlog` — cada request loguea: wallet_id, tool, costo, status, latencia. No loguear API keys ni balances en texto plano.  
 **Commit:** `feat: structured error handling and logging`
@@ -43,10 +43,10 @@ en markdown limpio. Tests con mock.
 ---
 
 ### TASK-20 · Tests de integración — ciclo completo
-**Issue GitHub:** #20  
+**Issue GitHub:** #21  
 **Estado:** `[ ]`  
-**Criterio de done:** Test suite que corre el ciclo completo con mocks para las 5 tools: create wallet → topup → call tool → check balance deducted → check transaction logged. Corre en CI (GitHub Actions).  
-**Commit:** `test: full integration test suite for all 5 tools`
+**Criterio de done:** Test suite que corre el ciclo completo con mocks para las 6 tools: create wallet → topup → call tool → check balance deducted → check transaction logged. Corre en CI (GitHub Actions).  
+**Commit:** `test: full integration test suite for all 6 tools`
 
 ---
 
