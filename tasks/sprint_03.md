@@ -2,7 +2,7 @@
 **Semanas:** 3-4 | **GitHub Project column:** Sprint 03  
 **Objetivo:** El patrón de metering está probado con 3 types de unidad distintos (tokens, imágenes). El gateway ya no es un wrapper de Anthropic — es un gateway real.
 
-**Estado general:** `[x]` Completo — 56/56 tests passing
+**Estado general:** `[x]` Completo — 56/56 tests passing — 2026-05-05
 
 ---
 
