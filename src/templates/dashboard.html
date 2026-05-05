@@ -6,28 +6,75 @@
   <title>Modelo Gateway — Dashboard</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 2rem; }
+    body { font-family: system-ui, sans-serif; background: #0d1219; color: #e0e0e0; padding: 2rem; }
     h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.5rem; color: #fff; }
-    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.25rem; }
-    .card .label { font-size: 0.75rem; color: #888; margin-bottom: 0.35rem; }
+    h2 { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.75rem; color: #555; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* Summary cards */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+    .card { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem; }
+    .card .label { font-size: 0.72rem; color: #6b7a8d; margin-bottom: 0.35rem; letter-spacing: 0.03em; }
     .card .value { font-size: 1.5rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
     .card .value.usdt { color: #4ade80; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th { text-align: left; padding: 0.5rem 0.75rem; color: #666; font-weight: 500; border-bottom: 1px solid #2a2a2a; }
-    td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e1e1e; font-variant-numeric: tabular-nums; }
-    tr:last-child td { border-bottom: none; }
-    .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+
+    /* Tool stats section */
+    .section { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem; margin-bottom: 2rem; }
+    .tool-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #1a2332; }
+    .tool-row:last-child { border-bottom: none; }
+    .empty { color: #3d4f63; font-size: 0.85rem; padding: 0.5rem 0; }
+
+    /* Tool & status badges (used both server-side and via JS) */
+    .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
     .badge-completed { background: #052e16; color: #4ade80; }
     .badge-upstream_error { background: #450a0a; color: #f87171; }
     .badge-insufficient_balance { background: #431407; color: #fb923c; }
     .badge-pending { background: #1e1b4b; color: #818cf8; }
-    .mono { font-family: monospace; font-size: 0.8rem; color: #888; }
-    .section { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.25rem; margin-bottom: 2rem; }
-    .tool-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #222; }
-    .tool-row:last-child { border-bottom: none; }
-    .empty { color: #555; font-size: 0.85rem; padding: 1rem 0; }
+    .tbadge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: #fff; }
+
+    /* Mono amounts */
+    .mono { font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; color: #8899aa; }
+
+    /* Wallet list */
+    .wallet-list { margin-bottom: 2rem; }
+    .wallet-card { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; transition: border-color 0.15s ease; }
+    .wallet-card:hover { border-color: #2a3d55; }
+    .wallet-card.open { border-color: #2a3d55; }
+
+    .wallet-header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.25rem; cursor: pointer; user-select: none;
+      transition: background 0.1s ease;
+    }
+    .wallet-header:hover { background: #192330; }
+    .wallet-card.open .wallet-header { background: #192330; }
+
+    .wh-left { flex: 1; min-width: 0; }
+    .wallet-agent { font-weight: 600; color: #e8edf2; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wallet-wid { display: block; font-family: monospace; font-size: 0.72rem; color: #3d5068; margin-top: 0.15rem; }
+
+    .wh-right { text-align: right; flex-shrink: 0; }
+    .wallet-balance { display: block; font-family: 'Courier New', Courier, monospace; font-size: 1.3rem; font-weight: 700; color: #4ade80; }
+    .wallet-calls { display: block; font-size: 0.72rem; color: #4a6278; margin-top: 0.1rem; }
+
+    .chevron { color: #3d5068; font-size: 1rem; line-height: 1; transition: transform 0.2s ease; flex-shrink: 0; font-weight: 300; }
+    .wallet-card.open .chevron { transform: rotate(90deg); }
+
+    /* Expand/collapse via CSS grid trick */
+    .wallet-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.25s ease; }
+    .wallet-card.open .wallet-body { grid-template-rows: 1fr; }
+    .body-inner { overflow: hidden; }
+
+    /* Detail content */
+    .wallet-detail { padding: 0 1.25rem 1.5rem; border-top: 1px solid #1a2332; }
+    .detail-label { font-size: 0.68rem; font-weight: 600; color: #3d5068; text-transform: uppercase; letter-spacing: 0.08em; margin: 1.1rem 0 0.6rem; }
+    .wallet-loading { padding: 1rem 1.25rem; color: #3d5068; font-size: 0.85rem; }
+
+    /* Tables inside detail */
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { text-align: left; padding: 0.4rem 0.6rem; color: #3d5068; font-weight: 500; border-bottom: 1px solid #1a2332; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #141b24; font-variant-numeric: tabular-nums; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #192330; }
   </style>
 </head>
 <body>
@@ -53,14 +100,14 @@
     </div>
   </div>
 
-  <!-- Per-tool breakdown -->
+  <!-- Global tool breakdown -->
   <h2>Tool usage</h2>
-  <div class="section" style="margin-bottom:2rem">
+  <div class="section">
     {% if tool_stats %}
       {% for row in tool_stats %}
         <div class="tool-row">
           <span>{{ row.tool }}</span>
-          <span>{{ row.count }} calls &nbsp;·&nbsp; <span style="color:#4ade80">{{ "%.6f"|format(row.total_cost) }} USDT</span></span>
+          <span>{{ row.count }} calls &nbsp;·&nbsp; <span style="color:#4ade80;font-family:monospace">{{ "%.6f"|format(row.total_cost) }} USDT</span></span>
         </div>
       {% endfor %}
     {% else %}
@@ -68,37 +115,147 @@
     {% endif %}
   </div>
 
-  <!-- Recent transactions -->
-  <h2>Last 20 transactions</h2>
-  <div class="section">
-    {% if transactions %}
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Tool</th>
-            <th>Status</th>
-            <th>Cost (USDT)</th>
-            <th>Fee (USDT)</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for tx in transactions %}
-          <tr>
-            <td class="mono">{{ tx.id | string | truncate(8, True, '') }}…</td>
-            <td>{{ tx.tool }}</td>
-            <td><span class="badge badge-{{ tx.status.value }}">{{ tx.status.value }}</span></td>
-            <td>{{ "%.6f"|format(tx.upstream_cost) }}</td>
-            <td>{{ "%.6f"|format(tx.fee_5pct) }}</td>
-            <td class="mono">{{ tx.created_at.strftime("%Y-%m-%d %H:%M") if tx.created_at else "—" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <div class="empty">No transactions yet.</div>
-    {% endif %}
-  </div>
+  <!-- Wallet list -->
+  <h2>Wallets</h2>
+  {% if wallet_list %}
+    <div class="wallet-list">
+      {% for w in wallet_list %}
+      <div class="wallet-card" id="card-{{ w.id }}">
+        <div class="wallet-header" onclick="toggleWallet('{{ w.id }}')">
+          <div class="wh-left">
+            <span class="wallet-agent">{{ w.agent_id }}</span>
+            <span class="wallet-wid">{{ w.id[:8] }}…</span>
+          </div>
+          <div class="wh-right">
+            <span class="wallet-balance">{{ "%.4f"|format(w.balance_usdt) }} USDT</span>
+            <span class="wallet-calls">{{ w.tx_count }} calls · {{ "%.4f"|format(w.total_spent) }} USDT spent</span>
+          </div>
+          <span class="chevron">›</span>
+        </div>
+        <div class="wallet-body" id="body-{{ w.id }}">
+          <div class="body-inner" id="inner-{{ w.id }}"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="section"><div class="empty">No wallets yet.</div></div>
+  {% endif %}
+
+<script>
+const TOOL_COLORS = {
+  anthropic:  '#6d28d9',
+  openai:     '#1d4ed8',
+  stability:  '#c2410c',
+  assemblyai: '#0f766e',
+  apify:      '#a16207',
+  firecrawl:  '#15803d'
+};
+
+let expandedId = null;
+const cache = {};
+
+function toolBadge(tool) {
+  const c = TOOL_COLORS[tool] || '#374151';
+  return `<span class="tbadge" style="background:${c}">${tool}</span>`;
+}
+
+function statusBadge(status) {
+  return `<span class="badge badge-${status}">${status}</span>`;
+}
+
+function buildDetail(data) {
+  const { transactions_last_10: txs, usage_by_tool: tools } = data;
+  let h = '<div class="wallet-detail">';
+
+  // Usage by tool
+  h += '<div class="detail-label">Usage by tool</div>';
+  if (tools.length) {
+    h += '<table><thead><tr><th>Tool</th><th>Calls</th><th>Upstream</th><th>Fees</th><th>Total</th></tr></thead><tbody>';
+    for (const r of tools) {
+      h += `<tr>
+        <td>${toolBadge(r.tool)}</td>
+        <td>${r.calls}</td>
+        <td class="mono">${r.upstream_total}</td>
+        <td class="mono">${r.fees_total}</td>
+        <td class="mono" style="color:#e0e0e0">${r.total}</td>
+      </tr>`;
+    }
+    h += '</tbody></table>';
+  } else {
+    h += '<div class="empty">No completed calls yet.</div>';
+  }
+
+  // Last 10 transactions
+  h += '<div class="detail-label" style="margin-top:1.4rem">Last 10 transactions</div>';
+  if (txs.length) {
+    h += '<table><thead><tr><th>ID</th><th>Time</th><th>Tool</th><th>Status</th><th>Cost</th><th>Fee</th><th>Total</th></tr></thead><tbody>';
+    for (const tx of txs) {
+      const short = tx.id.substring(0, 8);
+      h += `<tr>
+        <td class="mono" title="${tx.id}" style="cursor:default">${short}…</td>
+        <td class="mono">${tx.created_at || '—'}</td>
+        <td>${toolBadge(tx.tool)}</td>
+        <td>${statusBadge(tx.status)}</td>
+        <td class="mono">${tx.upstream_cost}</td>
+        <td class="mono">${tx.fee_5pct}</td>
+        <td class="mono" style="color:#e0e0e0">${tx.total_cost}</td>
+      </tr>`;
+    }
+    h += '</tbody></table>';
+  } else {
+    h += '<div class="empty">No transactions yet.</div>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+async function toggleWallet(id) {
+  const card = document.getElementById('card-' + id);
+  const inner = document.getElementById('inner-' + id);
+
+  if (expandedId === id) {
+    card.classList.remove('open');
+    expandedId = null;
+    history.replaceState(null, '', '/dashboard');
+    return;
+  }
+
+  if (expandedId) {
+    document.getElementById('card-' + expandedId).classList.remove('open');
+    expandedId = null;
+  }
+
+  expandedId = id;
+  card.classList.add('open');
+  history.replaceState(null, '', '/dashboard?wallet=' + id);
+
+  if (cache[id]) {
+    inner.innerHTML = buildDetail(cache[id]);
+    return;
+  }
+
+  inner.innerHTML = '<div class="wallet-loading">Loading…</div>';
+
+  try {
+    const resp = await fetch('/dashboard/wallet/' + id);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    cache[id] = await resp.json();
+    inner.innerHTML = buildDetail(cache[id]);
+  } catch (e) {
+    inner.innerHTML = '<div class="wallet-loading" style="color:#f87171">Failed to load data.</div>';
+  }
+}
+
+// Auto-expand from URL on load
+(function () {
+  const p = new URLSearchParams(window.location.search);
+  const wid = p.get('wallet');
+  if (wid && document.getElementById('card-' + wid)) {
+    toggleWallet(wid);
+  }
+}());
+</script>
 </body>
 </html>
