@@ -25,9 +25,12 @@
 **Fecha:** Abril 2026  
 **Razón:** Mínima complejidad de frontend. El dashboard V1 es interno/demo, no producto consumer. React agrega build pipeline innecesario para esta etapa.
 
-## DEC-006 — 5 tools en C1: Anthropic, OpenAI, Stability, AssemblyAI, Apify
-**Fecha:** Abril 2026  
-**Razón:** Cubre 3 tipos de unidad de cobro (per-token, per-image, per-minute, per-run). Apify sobre Browserbase por mayor madurez de API. Perplexity se agrega en V2.
+## DEC-006 — 6 tools en C1: Anthropic, OpenAI, Stability, AssemblyAI, Apify, Firecrawl
+**Fecha:** Abril 2026 — actualizado Mayo 2026  
+**Razón:** Cubre 4 tipos de unidad de cobro (per-token, per-image, per-minute, per-run, per-page).
+Firecrawl agregado como sexta tool: MCP oficial disponible, pricing per-page limpio,
+alto valor demo (URL → markdown para LLM), complementa Apify sin solaparse.
+Apify = scraping complejo/async. Firecrawl = extracción rápida de contenido de URL específica.
 
 ## DEC-007 — Hosting en Railway
 **Fecha:** Abril 2026  

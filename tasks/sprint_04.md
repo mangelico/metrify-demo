@@ -1,6 +1,6 @@
-# Sprint 04 — AssemblyAI + Apify + Error handling robusto
+# Sprint 04 — AssemblyAI + Apify + Firecrawl + Error handling robusto
 **Semanas:** 4-5 | **GitHub Project column:** Sprint 04  
-**Objetivo:** Las 5 tools del C1 están funcionando. El gateway maneja errores de producción sin explotar.
+**Objetivo:** Las 6 tools del C1 están funcionando. El gateway maneja errores de producción sin explotar.
 
 **Estado general:** `[ ]` Bloqueado hasta completar Sprint 03
 
@@ -24,6 +24,16 @@
 
 ---
 
+### TASK-18b · Firecrawl wrapper (per-page scraping)
+**Issue GitHub:** #17  
+**Estado:** `[ ]`  
+**Criterio de done:** `FirecrawlWrapper(BaseMCPWrapper)`. Costo por página scrapeada.
+El "uso real" post-call es binario: 1 página extraída o 0 si error. Devuelve contenido
+en markdown limpio. Tests con mock.  
+**Commit:** `feat: firecrawl wrapper (per-page billing)`
+
+---
+
 ### TASK-19 · Error handling y logging estructurado
 **Issue GitHub:** #19  
 **Estado:** `[ ]`  
@@ -42,8 +52,9 @@
 
 ## Definición de "Sprint 04 completo"
 
-- [ ] Las 5 tools responden desde el gateway
+- [ ] Las 6 tools responden desde el gateway
 - [ ] AssemblyAI cobra por minuto correctamente
 - [ ] Apify maneja el ciclo async sin cobrar si falla
 - [ ] Todos los errores tienen formato consistente
+- [ ] Firecrawl extrae contenido de URL y cobra por página correctamente
 - [ ] Test suite completo corriendo en CI
