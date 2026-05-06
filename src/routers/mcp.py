@@ -18,6 +18,7 @@ from src.wrappers.anthropic_wrapper import AnthropicWrapper
 from src.wrappers.openai_wrapper import OpenAIWrapper
 from src.wrappers.stability_wrapper import StabilityWrapper
 from src.wrappers.assemblyai_wrapper import AssemblyAIWrapper
+from src.wrappers.apify_wrapper import ApifyWrapper
 from src.wrappers.base import UpstreamError
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -27,6 +28,7 @@ _WRAPPERS = {
     "openai": OpenAIWrapper(),
     "stability": StabilityWrapper(),
     "assemblyai": AssemblyAIWrapper(),
+    "apify": ApifyWrapper(),
 }
 
 
