@@ -17,6 +17,7 @@ from src.services.metering import InsufficientBalanceError, MeteringService
 from src.wrappers.anthropic_wrapper import AnthropicWrapper
 from src.wrappers.openai_wrapper import OpenAIWrapper
 from src.wrappers.stability_wrapper import StabilityWrapper
+from src.wrappers.assemblyai_wrapper import AssemblyAIWrapper
 from src.wrappers.base import UpstreamError
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -25,6 +26,7 @@ _WRAPPERS = {
     "anthropic": AnthropicWrapper(),
     "openai": OpenAIWrapper(),
     "stability": StabilityWrapper(),
+    "assemblyai": AssemblyAIWrapper(),
 }
 
 
