@@ -1,3 +1,4 @@
+import time
 import uuid
 from decimal import Decimal
 from typing import Any, Dict, Optional
@@ -11,6 +12,7 @@ from src.auth import require_api_key
 from src.config import settings
 from src.database import get_db
 from src.limiter import limiter
+from src.logging_config import get_logger
 from src.models.transaction import TransactionStatus
 from src.models.wallet import Wallet
 from src.services.metering import InsufficientBalanceError, MeteringService
@@ -21,6 +23,8 @@ from src.wrappers.assemblyai_wrapper import AssemblyAIWrapper
 from src.wrappers.apify_wrapper import ApifyWrapper
 from src.wrappers.firecrawl_wrapper import FirecrawlWrapper
 from src.wrappers.base import UpstreamError
+
+logger = get_logger("mcp")
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
@@ -44,6 +48,10 @@ def _rate_limit() -> str:
     return f"{settings.rate_limit_per_minute}/minute"
 
 
+def _request_id(request: Request) -> str:
+    return getattr(request.state, "request_id", str(uuid.uuid4()))
+
+
 @router.post("/call")
 @limiter.limit(_rate_limit)
 async def mcp_call(
@@ -52,13 +60,23 @@ async def mcp_call(
     wallet: Wallet = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
+    request_id = _request_id(request)
+    t0 = time.monotonic()
+
     wrapper = _WRAPPERS.get(body.tool)
     if wrapper is None:
+        logger.warning(
+            "tool_not_found",
+            tool=body.tool,
+            wallet_id=str(wallet.id),
+            request_id=request_id,
+        )
         raise HTTPException(
             status_code=404,
             detail={
-                "error": "tool_not_found",
-                "tool": body.tool,
+                "error": "TOOL_NOT_FOUND",
+                "message": f"Tool '{body.tool}' is not available.",
+                "request_id": request_id,
                 "available_tools": list(_WRAPPERS.keys()),
             },
         )
@@ -73,9 +91,21 @@ async def mcp_call(
 
     sufficient = await metering.check_balance(wallet.id, estimated_total)
     if not sufficient:
+        logger.warning(
+            "insufficient_balance",
+            tool=body.tool,
+            wallet_id=str(wallet.id),
+            estimated_cost=str(estimated_cost),
+            request_id=request_id,
+        )
         raise HTTPException(
             status_code=402,
-            detail={"error": "insufficient_balance", "required_usdt": str(estimated_total)},
+            detail={
+                "error": "INSUFFICIENT_BALANCE",
+                "message": "Wallet balance is too low for this request.",
+                "request_id": request_id,
+                "required_usdt": str(estimated_total),
+            },
         )
 
     # CALL upstream
@@ -83,6 +113,15 @@ async def mcp_call(
         result, actual_cost = await wrapper.call(body.params)
         tx_status = TransactionStatus.completed
     except UpstreamError as exc:
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        logger.error(
+            "upstream_error",
+            tool=body.tool,
+            wallet_id=str(wallet.id),
+            upstream_status_code=exc.status_code,
+            latency_ms=latency_ms,
+            request_id=request_id,
+        )
         tx = await metering.debit(
             wallet_id=wallet.id,
             actual_cost=Decimal("0"),
@@ -95,7 +134,12 @@ async def mcp_call(
         )
         raise HTTPException(
             status_code=502,
-            detail={"error": "upstream_error", "message": str(exc), "transaction_id": str(tx.id)},
+            detail={
+                "error": "UPSTREAM_ERROR",
+                "message": str(exc),
+                "request_id": request_id,
+                "transaction_id": str(tx.id),
+            },
         )
 
     # POST: debit
@@ -111,9 +155,28 @@ async def mcp_call(
             response_meta={"usage": result.get("usage")},
         )
     except InsufficientBalanceError:
-        raise HTTPException(status_code=402, detail={"error": "insufficient_balance"})
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "INSUFFICIENT_BALANCE",
+                "message": "Wallet balance is too low after actual cost was computed.",
+                "request_id": request_id,
+            },
+        )
 
     remaining = await metering.get_balance(wallet.id)
+    latency_ms = int((time.monotonic() - t0) * 1000)
+
+    logger.info(
+        "tool_call_completed",
+        tool=body.tool,
+        wallet_id=str(wallet.id),
+        cost_usdt=str(actual_cost),
+        total_usdt=str(tx.total_cost),
+        status="completed",
+        latency_ms=latency_ms,
+        request_id=request_id,
+    )
 
     return JSONResponse(
         content={
@@ -122,6 +185,7 @@ async def mcp_call(
             "cost_usdt": str(tx.upstream_cost),
             "fee_usdt": str(tx.fee_5pct),
             "total_usdt": str(tx.total_cost),
+            "request_id": request_id,
         },
         headers={"X-Balance-Remaining": str(remaining)},
     )

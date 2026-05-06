@@ -4,12 +4,20 @@ from slowapi.errors import RateLimitExceeded
 from starlette.requests import Request
 
 from src.limiter import limiter
+from src.logging_config import configure_logging
 from src.routers import dashboard, health, keys, mcp, wallets
+
+configure_logging()
 
 
 def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", "")
     response = JSONResponse(
-        {"error": "rate_limit_exceeded", "detail": str(exc.detail)},
+        {
+            "error": "RATE_LIMIT_EXCEEDED",
+            "message": str(exc.detail),
+            "request_id": request_id,
+        },
         status_code=429,
     )
     retry_after = getattr(exc, "retry_after", None)

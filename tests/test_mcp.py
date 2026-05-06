@@ -106,7 +106,7 @@ async def test_mcp_call_unknown_tool():
             )
         assert resp.status_code == 404
         detail = resp.json()["detail"]
-        assert detail["error"] == "tool_not_found"
+        assert detail["error"] == "TOOL_NOT_FOUND"
         assert "available_tools" in detail
         assert "anthropic" in detail["available_tools"]
         assert "openai" in detail["available_tools"]
@@ -141,7 +141,7 @@ async def test_mcp_call_insufficient_balance():
                     json={"tool": "anthropic", "params": {"messages": [], "max_tokens": 10}},
                 )
         assert resp.status_code == 402
-        assert resp.json()["detail"]["error"] == "insufficient_balance"
+        assert resp.json()["detail"]["error"] == "INSUFFICIENT_BALANCE"
     finally:
         app.dependency_overrides.clear()
 
@@ -177,7 +177,7 @@ async def test_mcp_call_upstream_error_no_debit():
                 )
         assert resp.status_code == 502
         detail = resp.json()["detail"]
-        assert detail["error"] == "upstream_error"
+        assert detail["error"] == "UPSTREAM_ERROR"
         # wallet balance must be untouched (no debit on upstream error)
         assert wallet.balance_usdt == Decimal("100")
     finally:
