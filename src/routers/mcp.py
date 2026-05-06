@@ -19,6 +19,7 @@ from src.wrappers.openai_wrapper import OpenAIWrapper
 from src.wrappers.stability_wrapper import StabilityWrapper
 from src.wrappers.assemblyai_wrapper import AssemblyAIWrapper
 from src.wrappers.apify_wrapper import ApifyWrapper
+from src.wrappers.firecrawl_wrapper import FirecrawlWrapper
 from src.wrappers.base import UpstreamError
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -29,6 +30,7 @@ _WRAPPERS = {
     "stability": StabilityWrapper(),
     "assemblyai": AssemblyAIWrapper(),
     "apify": ApifyWrapper(),
+    "firecrawl": FirecrawlWrapper(),
 }
 
 
