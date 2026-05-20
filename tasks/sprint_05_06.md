@@ -69,7 +69,7 @@ Se ve bien en 1280x720. Tema oscuro mantenido.
 
 ### TASK-25 · Docs de deploy
 **Issue GitHub:** #26  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** DEPLOY.md con requisitos, pasos fork→Railway→variables→
 deploy, lista completa de env vars con descripción, cómo conseguir cada API key,
 3 endpoints de verificación, cómo conectar Claude Desktop.  
@@ -81,11 +81,15 @@ deploy, lista completa de env vars con descripción, cómo conseguir cada API ke
 
 - [ ] Claude Desktop se conecta al gateway y ve las 6 tools
 - [ ] Demo script corre end-to-end con API keys reales
-- [ ] README que un agente LLM puede leer y entender cómo conectarse
-- [ ] Dashboard se ve bien en screen share
-- [ ] DEPLOY.md permite fork→running en 30 minutos
-- [ ] Gateway listado en al menos 2 directorios MCP (manual)
+- [x] README que un agente LLM puede leer y entender cómo conectarse
+- [x] Dashboard se ve bien en screen share
+- [x] DEPLOY.md permite fork→running en 30 minutos
+- [ ] Gateway listado en al menos 2 directorios MCP (manual) — TASK-23
 - [ ] 3 personas externas lo probaron sin ayuda
+
+**Verificación producción (2026-05-21):**  
+POST /mcp → initialize ✅ · tools/list ✅ · tools/call con billing ✅  
+105 tests passing. Pendiente: Claude Desktop manual + listing directorios.
 
 **Siguiente paso post-C1:** Lanzar en Hacker News. Beta privada con 
 $5 de crédito para los primeros 10 developers.
