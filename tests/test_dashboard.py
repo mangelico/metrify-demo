@@ -61,14 +61,16 @@ def _db_with_data(wallets=None, txs=None):
                 result.scalar.return_value = 5
             elif call_count == 4: # total fees
                 result.scalar.return_value = Decimal("0.005")
-            elif call_count == 5: # tool stats
+            elif call_count == 5: # tool stats (all-time)
                 result.__iter__ = MagicMock(return_value=iter([]))
             elif call_count == 6: # wallet list
                 scalars = MagicMock()
                 scalars.all.return_value = wallets
                 result.scalars.return_value = scalars
-            else:                 # wallet agg stats
+            else:
+                # wallet agg stats / tool_24h / total_volume — safe defaults for any extra query
                 result.__iter__ = MagicMock(return_value=iter([]))
+                result.scalar.return_value = Decimal("0")
             return result
 
         db.execute = AsyncMock(side_effect=execute_side_effect)

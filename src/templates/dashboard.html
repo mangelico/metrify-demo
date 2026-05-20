@@ -4,121 +4,160 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Modelo Gateway — Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #0d1219; color: #e0e0e0; padding: 2rem; }
-    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.5rem; color: #fff; }
-    h2 { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.75rem; color: #555; text-transform: uppercase; letter-spacing: 0.08em; }
+    body { font-family: system-ui, sans-serif; background: #0d1219; color: #e0e0e0; padding: 2rem; min-width: 900px; }
 
-    /* Summary cards */
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
-    .card { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem; }
-    .card .label { font-size: 0.72rem; color: #6b7a8d; margin-bottom: 0.35rem; letter-spacing: 0.03em; }
-    .card .value { font-size: 1.5rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
-    .card .value.usdt { color: #4ade80; }
+    /* Header */
+    .site-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.35rem; }
+    .site-header h1 { font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+    .tagline { font-size: 0.82rem; color: #4a6278; }
+    .live-dot { display: inline-block; width: 7px; height: 7px; background: #4ade80; border-radius: 50%; margin-right: 0.35rem; box-shadow: 0 0 6px #4ade80; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .header-meta { font-size: 0.75rem; color: #3d5068; margin-bottom: 2rem; }
 
-    /* Tool stats section */
-    .section { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem; margin-bottom: 2rem; }
-    .tool-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #1a2332; }
+    /* Metric cards */
+    .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem 1.5rem; }
+    .card .label { font-size: 0.7rem; color: #6b7a8d; margin-bottom: 0.35rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    .card .value { font-size: 1.6rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .card .value.green { color: #4ade80; }
+    .card .value.live { color: #4ade80; font-size: 1.1rem; display: flex; align-items: center; gap: 0.3rem; padding-top: 0.25rem; }
+
+    /* Two-column layout */
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .section { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem; }
+    .section-title { font-size: 0.7rem; font-weight: 600; color: #3d5068; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+
+    /* Tool usage table */
+    .tool-row { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid #1a2332; gap: 0.75rem; }
     .tool-row:last-child { border-bottom: none; }
-    .empty { color: #3d4f63; font-size: 0.85rem; padding: 0.5rem 0; }
+    .empty { color: #3d4f63; font-size: 0.82rem; padding: 0.5rem 0; }
+    .calls-num { font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; color: #8899aa; }
+    .calls-vol { font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; color: #4ade80; margin-left: 0.5rem; }
 
-    /* Tool & status badges (used both server-side and via JS) */
-    .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    /* Chart container */
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Tool & status badges */
+    .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; }
     .badge-completed { background: #052e16; color: #4ade80; }
     .badge-upstream_error { background: #450a0a; color: #f87171; }
     .badge-insufficient_balance { background: #431407; color: #fb923c; }
     .badge-pending { background: #1e1b4b; color: #818cf8; }
-    .tbadge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: #fff; }
+    .tbadge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; color: #fff; white-space: nowrap; }
 
-    /* Mono amounts */
-    .mono { font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; color: #8899aa; }
+    /* Mono */
+    .mono { font-family: 'Courier New', Courier, monospace; font-size: 0.78rem; color: #8899aa; }
 
     /* Wallet list */
-    .wallet-list { margin-bottom: 2rem; }
-    .wallet-card { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; transition: border-color 0.15s ease; }
+    .wallet-list-wrap { background: #141b24; border: 1px solid #1e2a38; border-radius: 8px; padding: 1.25rem; }
+    .wallet-card { border: 1px solid #1a2332; border-radius: 6px; margin-bottom: 0.45rem; overflow: hidden; transition: border-color 0.15s ease; }
+    .wallet-card:last-child { margin-bottom: 0; }
     .wallet-card:hover { border-color: #2a3d55; }
     .wallet-card.open { border-color: #2a3d55; }
 
-    .wallet-header {
-      display: flex; align-items: center; gap: 1rem;
-      padding: 1rem 1.25rem; cursor: pointer; user-select: none;
-      transition: background 0.1s ease;
-    }
-    .wallet-header:hover { background: #192330; }
-    .wallet-card.open .wallet-header { background: #192330; }
+    .wallet-header { display: flex; align-items: center; gap: 1rem; padding: 0.85rem 1rem; cursor: pointer; user-select: none; transition: background 0.1s; }
+    .wallet-header:hover, .wallet-card.open .wallet-header { background: #192330; }
 
     .wh-left { flex: 1; min-width: 0; }
-    .wallet-agent { font-weight: 600; color: #e8edf2; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .wallet-wid { display: block; font-family: monospace; font-size: 0.72rem; color: #3d5068; margin-top: 0.15rem; }
-
+    .wallet-agent { font-weight: 600; color: #e8edf2; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; }
+    .wallet-wid { display: block; font-family: monospace; font-size: 0.68rem; color: #3d5068; margin-top: 0.1rem; }
     .wh-right { text-align: right; flex-shrink: 0; }
-    .wallet-balance { display: block; font-family: 'Courier New', Courier, monospace; font-size: 1.3rem; font-weight: 700; color: #4ade80; }
-    .wallet-calls { display: block; font-size: 0.72rem; color: #4a6278; margin-top: 0.1rem; }
-
-    .chevron { color: #3d5068; font-size: 1rem; line-height: 1; transition: transform 0.2s ease; flex-shrink: 0; font-weight: 300; }
+    .wallet-balance { display: block; font-family: 'Courier New', Courier, monospace; font-size: 1.2rem; font-weight: 700; color: #4ade80; }
+    .wallet-calls { display: block; font-size: 0.68rem; color: #4a6278; margin-top: 0.1rem; }
+    .chevron { color: #3d5068; font-size: 1rem; transition: transform 0.2s; flex-shrink: 0; }
     .wallet-card.open .chevron { transform: rotate(90deg); }
 
-    /* Expand/collapse via CSS grid trick */
     .wallet-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.25s ease; }
     .wallet-card.open .wallet-body { grid-template-rows: 1fr; }
     .body-inner { overflow: hidden; }
 
-    /* Detail content */
-    .wallet-detail { padding: 0 1.25rem 1.5rem; border-top: 1px solid #1a2332; }
-    .detail-label { font-size: 0.68rem; font-weight: 600; color: #3d5068; text-transform: uppercase; letter-spacing: 0.08em; margin: 1.1rem 0 0.6rem; }
-    .wallet-loading { padding: 1rem 1.25rem; color: #3d5068; font-size: 0.85rem; }
+    .wallet-detail { padding: 0 1rem 1.25rem; border-top: 1px solid #1a2332; }
+    .detail-label { font-size: 0.65rem; font-weight: 600; color: #3d5068; text-transform: uppercase; letter-spacing: 0.08em; margin: 1rem 0 0.5rem; }
+    .wallet-loading { padding: 0.75rem 1rem; color: #3d5068; font-size: 0.82rem; }
 
-    /* Tables inside detail */
-    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    th { text-align: left; padding: 0.4rem 0.6rem; color: #3d5068; font-weight: 500; border-bottom: 1px solid #1a2332; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
-    td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #141b24; font-variant-numeric: tabular-nums; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.79rem; }
+    th { text-align: left; padding: 0.35rem 0.5rem; color: #3d5068; font-weight: 500; border-bottom: 1px solid #1a2332; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #141b24; font-variant-numeric: tabular-nums; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #192330; }
+
+    h2 { font-size: 0.7rem; font-weight: 600; color: #3d5068; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem; }
   </style>
 </head>
 <body>
-  <h1>Modelo Gateway</h1>
 
-  <!-- Summary cards -->
-  <div class="grid">
+  <!-- Header -->
+  <div class="site-header">
+    <h1>Modelo Gateway</h1>
+    <span class="tagline">The payment layer every MCP server will need.</span>
+  </div>
+  <div class="header-meta">
+    <span class="live-dot"></span>Live &nbsp;·&nbsp;
+    6 tools &nbsp;·&nbsp;
+    MCP endpoint: <code style="font-size:0.72rem;color:#6b7a8d">/mcp</code> &nbsp;·&nbsp;
+    HTTP API: <code style="font-size:0.72rem;color:#6b7a8d">/mcp/call</code>
+  </div>
+
+  <!-- Metric cards -->
+  <div class="metrics">
     <div class="card">
-      <div class="label">Total Wallets</div>
+      <div class="label">Wallets</div>
       <div class="value">{{ stats.wallet_count }}</div>
     </div>
     <div class="card">
-      <div class="label">Total Balance (USDT)</div>
-      <div class="value usdt">{{ "%.4f"|format(stats.total_balance) }}</div>
-    </div>
-    <div class="card">
-      <div class="label">Transactions (all time)</div>
+      <div class="label">All-time calls</div>
       <div class="value">{{ stats.tx_count }}</div>
     </div>
     <div class="card">
-      <div class="label">Fees Collected (USDT)</div>
-      <div class="value usdt">{{ "%.6f"|format(stats.total_fees) }}</div>
+      <div class="label">Volume (USDT)</div>
+      <div class="value green">{{ "%.4f"|format(stats.total_volume) }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Fees collected</div>
+      <div class="value green">{{ "%.6f"|format(stats.total_fees) }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Status</div>
+      <div class="value live"><span class="live-dot" style="width:9px;height:9px"></span>Live</div>
     </div>
   </div>
 
-  <!-- Global tool breakdown -->
-  <h2>Tool usage</h2>
-  <div class="section">
-    {% if tool_stats %}
-      {% for row in tool_stats %}
-        <div class="tool-row">
-          <span>{{ row.tool }}</span>
-          <span>{{ row.count }} calls &nbsp;·&nbsp; <span style="color:#4ade80;font-family:monospace">{{ "%.6f"|format(row.total_cost) }} USDT</span></span>
-        </div>
-      {% endfor %}
-    {% else %}
-      <div class="empty">No transactions yet.</div>
-    {% endif %}
+  <!-- Chart + Tool stats side by side -->
+  <div class="layout">
+    <!-- Bar chart: last 24h -->
+    <div class="section">
+      <div class="section-title">Calls by tool — last 24 hours</div>
+      <div class="chart-wrap">
+        <canvas id="toolChart"></canvas>
+      </div>
+    </div>
+
+    <!-- All-time tool breakdown -->
+    <div class="section">
+      <div class="section-title">All-time tool usage</div>
+      {% if tool_stats %}
+        {% for row in tool_stats %}
+          <div class="tool-row">
+            <span id="tl-{{ row.tool }}" class="tbadge">{{ row.tool }}</span>
+            <span>
+              <span class="calls-num">{{ row.count }} calls</span>
+              <span class="calls-vol">{{ "%.6f"|format(row.total_cost) }} USDT</span>
+            </span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No transactions yet.</div>
+      {% endif %}
+    </div>
   </div>
 
   <!-- Wallet list -->
   <h2>Wallets</h2>
   {% if wallet_list %}
-    <div class="wallet-list">
+    <div class="wallet-list-wrap">
       {% for w in wallet_list %}
       <div class="wallet-card" id="card-{{ w.id }}">
         <div class="wallet-header" onclick="toggleWallet('{{ w.id }}')">
@@ -128,7 +167,7 @@
           </div>
           <div class="wh-right">
             <span class="wallet-balance">{{ "%.4f"|format(w.balance_usdt) }} USDT</span>
-            <span class="wallet-calls">{{ w.tx_count }} calls · {{ "%.4f"|format(w.total_spent) }} USDT spent</span>
+            <span class="wallet-calls">{{ w.tx_count }} calls · {{ "%.4f"|format(w.total_spent) }} spent</span>
           </div>
           <span class="chevron">›</span>
         </div>
@@ -143,15 +182,83 @@
   {% endif %}
 
 <script>
+// Tool colors
 const TOOL_COLORS = {
-  anthropic:  '#6d28d9',
-  openai:     '#1d4ed8',
-  stability:  '#c2410c',
-  assemblyai: '#0f766e',
-  apify:      '#a16207',
-  firecrawl:  '#15803d'
+  anthropic:  '#7c3aed',
+  openai:     '#2563eb',
+  stability:  '#ea580c',
+  assemblyai: '#0d9488',
+  apify:      '#ca8a04',
+  firecrawl:  '#16a34a'
 };
 
+// Apply colors to all-time tool badges
+for (const [tool, color] of Object.entries(TOOL_COLORS)) {
+  const el = document.getElementById('tl-' + tool);
+  if (el) el.style.background = color;
+}
+
+// Chart.js — bar chart for last 24h
+const chartData = {{ chart_data | tojson }};
+const ctx = document.getElementById('toolChart').getContext('2d');
+
+const bgColors = chartData.labels.map(t => TOOL_COLORS[t] || '#374151');
+const borderColors = bgColors.map(c => c + 'cc');
+
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: chartData.labels,
+    datasets: [{
+      label: 'Calls (24h)',
+      data: chartData.calls,
+      backgroundColor: bgColors.map(c => c + '99'),
+      borderColor: bgColors,
+      borderWidth: 1.5,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          afterLabel: (ctx) => {
+            const vol = chartData.volume[ctx.dataIndex];
+            return vol > 0 ? `Volume: ${vol.toFixed(6)} USDT` : '';
+          }
+        },
+        backgroundColor: '#141b24',
+        borderColor: '#2a3d55',
+        borderWidth: 1,
+        titleColor: '#e0e0e0',
+        bodyColor: '#8899aa',
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#6b7a8d', font: { size: 11 } },
+        grid: { color: '#1a2332' },
+        border: { color: '#1a2332' }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: '#6b7a8d',
+          font: { size: 11 },
+          stepSize: 1,
+          callback: v => Number.isInteger(v) ? v : ''
+        },
+        grid: { color: '#1a2332' },
+        border: { color: '#1a2332' }
+      }
+    }
+  }
+});
+
+// Wallet expand/collapse
 let expandedId = null;
 const cache = {};
 
@@ -168,7 +275,6 @@ function buildDetail(data) {
   const { transactions_last_10: txs, usage_by_tool: tools } = data;
   let h = '<div class="wallet-detail">';
 
-  // Usage by tool
   h += '<div class="detail-label">Usage by tool</div>';
   if (tools.length) {
     h += '<table><thead><tr><th>Tool</th><th>Calls</th><th>Upstream</th><th>Fees</th><th>Total</th></tr></thead><tbody>';
@@ -186,14 +292,12 @@ function buildDetail(data) {
     h += '<div class="empty">No completed calls yet.</div>';
   }
 
-  // Last 10 transactions
-  h += '<div class="detail-label" style="margin-top:1.4rem">Last 10 transactions</div>';
+  h += '<div class="detail-label" style="margin-top:1.25rem">Last 10 transactions</div>';
   if (txs.length) {
     h += '<table><thead><tr><th>ID</th><th>Time</th><th>Tool</th><th>Status</th><th>Cost</th><th>Fee</th><th>Total</th></tr></thead><tbody>';
     for (const tx of txs) {
-      const short = tx.id.substring(0, 8);
       h += `<tr>
-        <td class="mono" title="${tx.id}" style="cursor:default">${short}…</td>
+        <td class="mono" title="${tx.id}">${tx.id.substring(0, 8)}…</td>
         <td class="mono">${tx.created_at || '—'}</td>
         <td>${toolBadge(tx.tool)}</td>
         <td>${statusBadge(tx.status)}</td>
@@ -221,40 +325,29 @@ async function toggleWallet(id) {
     history.replaceState(null, '', '/dashboard');
     return;
   }
-
   if (expandedId) {
     document.getElementById('card-' + expandedId).classList.remove('open');
     expandedId = null;
   }
-
   expandedId = id;
   card.classList.add('open');
   history.replaceState(null, '', '/dashboard?wallet=' + id);
 
-  if (cache[id]) {
-    inner.innerHTML = buildDetail(cache[id]);
-    return;
-  }
-
+  if (cache[id]) { inner.innerHTML = buildDetail(cache[id]); return; }
   inner.innerHTML = '<div class="wallet-loading">Loading…</div>';
-
   try {
     const resp = await fetch('/dashboard/wallet/' + id);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     cache[id] = await resp.json();
     inner.innerHTML = buildDetail(cache[id]);
-  } catch (e) {
+  } catch {
     inner.innerHTML = '<div class="wallet-loading" style="color:#f87171">Failed to load data.</div>';
   }
 }
 
-// Auto-expand from URL on load
 (function () {
-  const p = new URLSearchParams(window.location.search);
-  const wid = p.get('wallet');
-  if (wid && document.getElementById('card-' + wid)) {
-    toggleWallet(wid);
-  }
+  const wid = new URLSearchParams(window.location.search).get('wallet');
+  if (wid && document.getElementById('card-' + wid)) toggleWallet(wid);
 }());
 </script>
 </body>

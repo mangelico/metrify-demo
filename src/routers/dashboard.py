@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.models.transaction import Transaction, TransactionStatus
 from src.models.wallet import Wallet
+
+_TOOL_ORDER = ["anthropic", "openai", "stability", "assemblyai", "apify", "firecrawl"]
 
 router = APIRouter(tags=["dashboard"])
 
@@ -86,6 +89,35 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)) -> HTM
             "total_spent": agg["total_spent"],
         })
 
+    # Last 24h per-tool call counts (for bar chart)
+    since_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+    tool_24h_rows = await db.execute(
+        select(
+            Transaction.tool,
+            func.count().label("calls"),
+            func.coalesce(func.sum(Transaction.total_cost), 0).label("volume"),
+        )
+        .where(
+            Transaction.status == TransactionStatus.completed,
+            Transaction.created_at >= since_24h,
+        )
+        .group_by(Transaction.tool)
+    )
+    tool_24h_map = {row.tool: {"calls": row.calls, "volume": float(row.volume)} for row in tool_24h_rows}
+    chart_data = {
+        "labels": _TOOL_ORDER,
+        "calls": [tool_24h_map.get(t, {}).get("calls", 0) for t in _TOOL_ORDER],
+        "volume": [tool_24h_map.get(t, {}).get("volume", 0.0) for t in _TOOL_ORDER],
+    }
+
+    # Volume (all-time completed)
+    total_volume_result = await db.execute(
+        select(func.coalesce(func.sum(Transaction.total_cost), 0)).where(
+            Transaction.status == TransactionStatus.completed
+        )
+    )
+    total_volume = Decimal(str(total_volume_result.scalar() or 0))
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -95,9 +127,11 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)) -> HTM
                 "total_balance": total_balance,
                 "tx_count": tx_count,
                 "total_fees": total_fees,
+                "total_volume": total_volume,
             },
             "tool_stats": tool_stats,
             "wallet_list": wallet_list,
+            "chart_data": chart_data,
         },
     )
 
