@@ -1,60 +1,91 @@
-# Sprint 05-06 — Demo-ready: pulido, README para agentes, listado público
+# Sprint 05-06 — MCP Protocol + Demo + Pulido público
 **Semanas:** 5-6 | **GitHub Project column:** Sprint 05-06  
-**Objetivo:** El gateway está listo para mostrar a early adopters. Alguien puede encontrarlo, entenderlo y probarlo en 30 minutos sin ayuda.
+**Objetivo:** El gateway es un MCP server real. Claude Desktop se conecta y 
+ve las 6 tools. El demo script muestra el pipeline autónomo completo. 
+Alguien puede encontrarlo, entenderlo y probarlo en 30 minutos sin ayuda.
 
-**Estado general:** `[ ]` Bloqueado hasta completar Sprint 04
+**Estado general:** `[ ]` Bloqueado hasta completar Sprint 04 ✅
 
 ---
 
 ## Tareas
 
-### TASK-21 · README escrito para LLMs y humanos
-**Issue GitHub:** #21  
+### TASK-MCP · Completar protocolo MCP estándar
+**Issue GitHub:** #27  
 **Estado:** `[ ]`  
-**Criterio de done:** README que incluye: qué es, por qué existe, quickstart en <5 pasos, ejemplo de curl para cada tool, tabla de precios (costo upstream + 5% fee), link al dashboard demo. Escrito para que un LLM lo entienda y elija usar el gateway.  
+**Criterio de done:** FastMCP con Streamable HTTP transport. Endpoint POST /mcp 
+maneja initialize, tools/list y tools/call con billing completo. Claude Desktop 
+puede conectarse con URL remota y ver las 6 tools. Auth via header X-API-Key.
+Al menos 4 tests: handshake, tools/list formato, tools/call con billing, 
+tools/call balance insuficiente.  
+**Commit:** `feat: complete MCP protocol (initialize, tools/list, tools/call)`
+
+---
+
+### TASK-21 · README para humanos y LLMs
+**Issue GitHub:** #22  
+**Estado:** `[ ]`  
+**Criterio de done:** README con tagline, qué es en 3 líneas, quickstart en 
+5 pasos, configuración Claude Desktop (JSON exacto), tabla de 6 tools con 
+precios, ejemplos curl, roadmap en 3 líneas, sección "For LLMs" en texto 
+plano para que un agente entienda cómo usarlo sin contexto adicional.  
 **Commit:** `docs: comprehensive README for humans and LLMs`
 
 ---
 
-### TASK-22 · Demo script — agente pagando su propio uso
-**Issue GitHub:** #22  
+### TASK-22 · Demo script — pipeline multimedia autónomo
+**Issue GitHub:** #23  
 **Estado:** `[ ]`  
-**Criterio de done:** Script Python `demo/agent_demo.py` que muestra el ciclo completo: crea wallet → hace top-up → llama 3 tools distintas → imprime balance antes/después. Es el script que se graba para el video de lanzamiento.  
-**Commit:** `demo: autonomous agent paying for its own tool usage`
+**Criterio de done:** Script demo/agent_demo.py que corre con 
+`python demo/agent_demo.py --url "https://ejemplo.com"`. Pipeline completo:
+crea wallet → topup $10 → Firecrawl scrapea URL → Claude resume → 
+Stability genera imagen → AssemblyAI narra audio. Imprime balance 
+antes/después y detalle de cada débito. Guarda outputs en demo/output/.
+Prints con emojis, legible en screen share.  
+**Commit:** `demo: multimedia pipeline (firecrawl→claude→stability→assemblyai)`
 
 ---
 
 ### TASK-23 · Listado en directorios MCP
-**Issue GitHub:** #23  
+**Issue GitHub:** #24  
 **Estado:** `[ ]`  
-**Criterio de done:** Gateway listado en: Smithery, Glama, mcp.so, PulseMCP. Cada listing usa el mismo description del README. Esta tarea la hace el founder manualmente.  
+**Criterio de done:** Gateway listado en Smithery, Glama, mcp.so, PulseMCP.
+Cada listing usa el mismo description del README. Esta tarea la hace el 
+founder manualmente una vez que TASK-MCP esté completa.  
 **Acción:** Manual — no es código.
 
 ---
 
-### TASK-24 · Dashboard V1.5 — pulido para demo
-**Issue GitHub:** #24  
+### TASK-24 · Dashboard pulido para demo
+**Issue GitHub:** #25  
 **Estado:** `[ ]`  
-**Criterio de done:** Dashboard muestra: balance en tiempo real, gráfico de uso por tool (últimas 24h), lista de transacciones con status visual. Se ve bien en una demo screen share.  
+**Criterio de done:** Dashboard con header "Modelo Gateway" + tagline, 
+métricas top (wallets/calls/volume/uptime), gráfico de barras por tool 
+últimas 24h con Chart.js CDN, transacciones con colores por tool. 
+Se ve bien en 1280x720. Tema oscuro mantenido.  
 **Commit:** `feat: polished dashboard for demo`
 
 ---
 
-### TASK-25 · .env.example completo + docs de deploy
-**Issue GitHub:** #25  
+### TASK-25 · Docs de deploy
+**Issue GitHub:** #26  
 **Estado:** `[ ]`  
-**Criterio de done:** Un developer puede hacer fork del repo y tenerlo corriendo en Railway en <30 minutos siguiendo las instrucciones. Incluir: setup de Railway, variables de entorno, primer top-up, primer call.  
+**Criterio de done:** DEPLOY.md con requisitos, pasos fork→Railway→variables→
+deploy, lista completa de env vars con descripción, cómo conseguir cada API key,
+3 endpoints de verificación, cómo conectar Claude Desktop.  
 **Commit:** `docs: complete deployment guide`
 
 ---
 
-## Definición de "C1 completo — demo-ready"
+## Definición de "Sprint 05-06 completo — C1 demo-ready"
 
-- [ ] Gateway en Railway respondiendo con uptime >99%
-- [ ] Las 5 tools funcionando en producción
-- [ ] README que un agente LLM puede leer y entender cómo usar el gateway
-- [ ] Demo script grabable que muestra el ciclo autónomo
-- [ ] Listado en al menos 2 directorios MCP
-- [ ] 3 personas externas lo probaron sin ayuda (dogfooding)
+- [ ] Claude Desktop se conecta al gateway y ve las 6 tools
+- [ ] Demo script corre end-to-end con API keys reales
+- [ ] README que un agente LLM puede leer y entender cómo conectarse
+- [ ] Dashboard se ve bien en screen share
+- [ ] DEPLOY.md permite fork→running en 30 minutos
+- [ ] Gateway listado en al menos 2 directorios MCP (manual)
+- [ ] 3 personas externas lo probaron sin ayuda
 
-**Siguiente paso post-C1:** Lanzar en Hacker News con el demo. Invitar a 10-20 developers a beta privada con $50 USDT de crédito gratuito.
+**Siguiente paso post-C1:** Lanzar en Hacker News. Beta privada con 
+$5 de crédito para los primeros 10 developers.
