@@ -12,7 +12,7 @@ Alguien puede encontrarlo, entenderlo y probarlo en 30 minutos sin ayuda.
 
 ### TASK-MCP · Completar protocolo MCP estándar
 **Issue GitHub:** #27  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** FastMCP con Streamable HTTP transport. Endpoint POST /mcp 
 maneja initialize, tools/list y tools/call con billing completo. Claude Desktop 
 puede conectarse con URL remota y ver las 6 tools. Auth via header X-API-Key.
@@ -24,7 +24,7 @@ tools/call balance insuficiente.
 
 ### TASK-21 · README para humanos y LLMs
 **Issue GitHub:** #22  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** README con tagline, qué es en 3 líneas, quickstart en 
 5 pasos, configuración Claude Desktop (JSON exacto), tabla de 6 tools con 
 precios, ejemplos curl, roadmap en 3 líneas, sección "For LLMs" en texto 
@@ -35,7 +35,7 @@ plano para que un agente entienda cómo usarlo sin contexto adicional.
 
 ### TASK-22 · Demo script — pipeline multimedia autónomo
 **Issue GitHub:** #23  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** Script demo/agent_demo.py que corre con 
 `python demo/agent_demo.py --url "https://ejemplo.com"`. Pipeline completo:
 crea wallet → topup $10 → Firecrawl scrapea URL → Claude resume → 
@@ -58,7 +58,7 @@ founder manualmente una vez que TASK-MCP esté completa.
 
 ### TASK-24 · Dashboard pulido para demo
 **Issue GitHub:** #25  
-**Estado:** `[ ]`  
+**Estado:** `[x]`  
 **Criterio de done:** Dashboard con header "Modelo Gateway" + tagline, 
 métricas top (wallets/calls/volume/uptime), gráfico de barras por tool 
 últimas 24h con Chart.js CDN, transacciones con colores por tool. 
