@@ -5,6 +5,18 @@
 
 ---
 
+## Sprint 07 — Admin Panel (necesario antes de abrir a usuarios reales)
+
+- [ ] **Panel admin con auth separada** — ruta `/admin` protegida, separada del dashboard público
+- [ ] **Revocar/rotar API keys** — desde el dashboard, sin tocar DB directamente
+- [ ] **Desactivar wallets** — flag `is_active` en tabla wallets, bloquear calls sin borrar historial
+- [ ] **Vista de todas las wallets** — tabla paginada con balance, calls, última actividad
+- [ ] **Admin token separado** — gestión del `ADMIN_TOKEN` desde UI, no solo env var
+
+> Prerequisito para beta pública. No bloquea el demo C1.
+
+---
+
 ## V2 — Post-validación del C1
 
 - [ ] **Polygon USDT on-chain** — migrar tabla wallets a smart contract ERC-20, web3.py integration
