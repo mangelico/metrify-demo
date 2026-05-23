@@ -1,163 +1,162 @@
-# CLAUDE.md — Modelo Gateway / MCP Billing Gateway
+# CLAUDE.md — metrify-demo (Provider de ejemplo para la red Metrify)
 
 > Este archivo es tu contexto completo. Léelo SIEMPRE antes de escribir cualquier línea de código.
-> Al terminar cada sesión, actualizá el estado de las tareas en `tasks/sprint_actual.md`.
+> Al terminar cada sesión, actualizá el estado de las tareas en el sprint activo de `tasks/`.
 
 ---
 
 ## Qué es este proyecto
 
-Un **MCP Billing Gateway** — infraestructura de pagos que permite a agentes de IA y developers consumir herramientas (LLMs, imagen, audio, web automation) pagando por uso en USDT, sin gestionar múltiples API keys ni suscripciones.
+**metrify-demo** es el primer provider de ejemplo de la red Metrify.
 
-Analogía: **Stripe para el ecosistema MCP**. No un gateway de tools — la capa de pagos sobre la que el ecosistema construye.
+Ya NO es un gateway propio con billing interno. Ahora es un **MCP server provider** que:
+- Expone 6 tools via FastMCP
+- Delega el billing completamente a **metrify-backend** via el SDK local `metrify/`
+- Demuestra el patrón correcto para cualquier provider que quiera unirse a la red
 
-Tagline: *"The payment layer every MCP server will need — before they know they need it."*
-
----
-
-## Stack — NO cambiar sin consultar
-
-| Capa | Tecnología | Razón |
-|---|---|---|
-| Gateway API | Python 3.11 + FastAPI | Stack principal del founder |
-| MCP wrappers | FastMCP | SDK oficial MCP en Python |
-| Base de datos | PostgreSQL en Railway | Wallets + transactions + audit |
-| Hosting | Railway | Deploy desde GitHub, zero config | https://web-production-b51ff.up.railway.app |
-| Settlement V1 | Postgres (simulado) | Valida flujo sin Solidity |
-| Settlement V2 | web3.py + Polygon | Post-validación del flujo |
-| Dashboard | FastAPI + Jinja2 | Simple, sin frontend framework |
-| Auth | API keys propias (headers) | Sin OAuth en V1 |
+Analogía: como un plugin de Stripe — implementa el SDK de pagos, no el motor de pagos.
 
 ---
 
-## Arquitectura — 4 capas
+## Arquitectura — 3 actores
 
 ```
-[Consumidores]  AI Agent / Developer  →  Un solo endpoint MCP
-      ↓
-[Gateway]       Auth → Metering (pre) → Router → MCP Wrapper → Upstream API → Metering (post) → Log
-      ↓
-[Datos]         Postgres: tabla wallets + tabla transactions + Dashboard
-      ↓
-[Tools C1]      Anthropic → OpenAI → Stability AI → AssemblyAI → Apify
+Consumer (AI Agent)  →  metrify-demo (provider)  →  metrify-backend (billing)
+                               ↓
+                        upstream APIs (Anthropic, OpenAI, etc.)
+```
+
+Flujo de cada tool call:
+```
+1. consumer_api_key llega en el primer param de cada tool
+2. @m.tool() pre-check → verifica balance en metrify-backend
+3. Tool llama la API upstream (Anthropic, OpenAI, etc.)
+4. @m.tool() charge → debita al consumer en metrify-backend
+5. Resultado retorna al consumer
+   Si upstream falla: NO se cobra (charge no se ejecuta)
 ```
 
 ---
 
-## Flujo de una transacción (el ciclo completo)
+## Stack
+
+| Capa | Tecnología |
+|---|---|
+| MCP Server | FastMCP (mcp>=1.9.0) |
+| Billing SDK | `metrify/` (local, llama metrify-backend via httpx) |
+| Hosting | Railway — https://web-production-b51ff.up.railway.app |
+| Tests | pytest + pytest-asyncio, 31 tests |
+
+---
+
+## Estructura del repo
 
 ```
-1. Agent POST /mcp/tool/call  {tool: "anthropic", params: {...}}
-2. Auth Layer     → valida API key, resuelve wallet_id
-3. Metering PRE   → consulta balance, estima costo, rechaza si insuficiente
-4. Router         → selecciona MCP wrapper correcto
-5. MCP Wrapper    → llama upstream API real
-6. Metering POST  → calcula costo exacto (uso real), aplica 5% fee, debita
-7. Log            → inserta en tabla transactions con idempotency_key
-8. Response       → devuelve resultado + header X-Balance-Remaining
+metrify-demo/
+  metrify/              ← SDK local del billing
+    __init__.py         ← exporta Metrify
+    exceptions.py       ← InsufficientBalanceError, GatewayError
+    sdk.py              ← Metrify class: _pre_check, _charge, .tool() decorator
+  tools/
+    __init__.py
+    anthropic_tool.py   ← register(server, m) → @server.tool() @m.tool()
+    openai_tool.py
+    stability_tool.py
+    assemblyai_tool.py  ← usa httpx REST (no SDK, incompatible Python 3.8)
+    apify_tool.py       ← usa run_in_executor (Python 3.8 compat)
+    firecrawl_tool.py   ← usa run_in_executor (Python 3.8 compat)
+  main.py               ← FastMCP server, registra las 6 tools, uvicorn
+  tests/
+    conftest.py         ← mock_server (passthrough) + mock_m (Metrify con _pre_check/_charge mockeados)
+    test_anthropic.py   ← 4 tests
+    test_openai.py      ← 4 tests
+    test_stability.py   ← 4 tests
+    test_assemblyai.py  ← 4 tests
+    test_apify.py       ← 4 tests
+    test_firecrawl.py   ← 4 tests
+    test_billing.py     ← 7 tests (verifica el SDK decorator)
+  tasks/
+    decisions.md
+    sprint_07_provider.md  ← este refactor
 ```
 
 ---
 
-## Regla crítica de negocio — NO charge on upstream error
+## Patrón de cada tool — doble decorator
 
-Si la upstream API falla después de procesar parte del request:
-- **NO se debita nada al agente**
-- Se loguea el intento con status `upstream_error`
-- Se usa idempotency_key para evitar doble débito en retries
-- Esta política es innegociable — es lo que diferencia el producto de competidores
-
----
-
-## Modelo de datos — tablas principales
-
-```sql
--- wallets
-id, agent_id (unique), master_id, balance_usdt (decimal 18,6),
-created_at, updated_at
--- top-up V1: POST /wallets/{id}/topup — suma balance directo en Postgres, sin crypto real
-
--- transactions  
-id, wallet_id (FK), tool, upstream_cost, fee_5pct, total_cost,
-status (pending|completed|upstream_error|insufficient_balance),
-idempotency_key (unique), request_payload (json), response_meta (json),
-created_at
+```python
+def register(server, m):
+    @server.tool()
+    @m.tool(price=0.000065, unit="per_token")
+    async def anthropic(consumer_api_key: str, prompt: str, max_tokens: int = 1024) -> str:
+        # billing ocurre en @m.tool ANTES y DESPUÉS de este código
+        ...
+    return anthropic
 ```
 
+**CRÍTICO:**
+- `consumer_api_key` SIEMPRE es el primer parámetro
+- `@m.tool` va DEBAJO de `@server.tool()`
+- Billing es: pre_check (antes) → upstream call → charge (si upstream OK)
+- Si upstream falla → NO se cobra (tool error retorna string, charge no ejecuta)
+
 ---
 
-## Las 5 tools del C1 — orden y tipo de unidad
+## Las 6 tools — precios
 
-| # | Tool | Unidad de cobro | Sem. objetivo |
+| Tool | Precio | Unidad | Modelo/API |
 |---|---|---|---|
-| 1 | Anthropic API | per-token (input+output) | 1-2 | claude-haiku-4-5 |
-| 2 | OpenAI API | per-token (input+output) | 2-3 | gpt-4o-mini |
-| 3 | Stability AI | per-image | 3 |
-| 4 | AssemblyAI | per-minute (audio) | 4 |
-| 5 | Apify | per-run (async) | 5 |
-
----
-
-## Fee model
-
-- **5% platform fee** sobre cada call, encima del costo upstream
-- Fee tiered por volumen (implementar en V2, no ahora)
-- El fee se calcula post-call sobre el costo real, no el estimado
-
----
-
-## Convenciones de código
-
-- **Siempre** usar async/await en FastAPI (no sync handlers)
-- **Siempre** usar Pydantic v2 para validación de requests/responses
-- **Siempre** agregar idempotency_key en cada transacción desde el día 1
-- **Nunca** hardcodear API keys — usar variables de entorno via python-dotenv
-- **Nunca** loguear valores de API keys o balances en texto plano
-- Tests: pytest, al menos happy path + error path por cada wrapper
-- Commits: conventional commits (`feat:`, `fix:`, `refactor:`, `test:`)
+| anthropic | 0.000065 | per_token | claude-haiku-4-5 |
+| openai | 0.000010 | per_token | gpt-4o-mini |
+| stability | 0.002 | per_image | SDXL v1 REST |
+| assemblyai | 0.00617 | per_minute | REST API directo |
+| apify | 0.005 | per_call | apify-client |
+| firecrawl | 0.001 | per_page | firecrawl-py |
 
 ---
 
 ## Variables de entorno requeridas
 
 ```
-DATABASE_URL=postgresql://...
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-STABILITY_API_KEY=...
-ASSEMBLYAI_API_KEY=...
-APIFY_API_TOKEN=...
-PLATFORM_FEE_PCT=0.05
-SECRET_KEY=...  # para signing de API keys internas
+METRIFY_PROVIDER_KEY   → pk_live_... (autenticación del provider con metrify-backend)
+METRIFY_GATEWAY_URL    → https://airy-wholeness-production-fcc4.up.railway.app
+ANTHROPIC_API_KEY      → sk-ant-...
+OPENAI_API_KEY         → sk-...
+STABILITY_API_KEY      → ...
+ASSEMBLYAI_API_KEY     → ...
+APIFY_API_KEY          → ...
+FIRECRAWL_API_KEY      → ...
+PORT                   → 8000 (Railway lo setea automáticamente)
 ```
+
+---
+
+## Convenciones de código
+
+- **Siempre** async/await en todos los handlers
+- **Nunca** hardcodear API keys — siempre `os.environ["KEY"]`
+- **Nunca** importar `assemblyai` SDK — incompatible con Python 3.8 (usa httpx directo)
+- **Siempre** usar `asyncio.get_running_loop().run_in_executor(None, lambda: ...)` para libs sync
+- Tests: pytest, 4 casos mínimo por tool (happy path, insufficient, gateway error, api failure)
+- Commits: conventional commits (`feat:`, `fix:`, `refactor:`, `test:`)
 
 ---
 
 ## Cómo retomar después de un reset de contexto
 
 1. Leer este archivo completo
-2. Leer `tasks/decisions.md` — decisiones ya cerradas, no reabrir
-3. Leer el sprint activo en `tasks/` — buscar tareas `[~]` (en progreso) o `[ ]` (pendientes)
-4. Continuar desde la primera tarea no completada
-5. Al terminar cada tarea: marcarla `[x]` en el archivo y cerrar el issue de GitHub con `gh issue close <N> --comment "Completado en <commit>"`
+2. Leer `tasks/decisions.md` — decisiones cerradas, no reabrir
+3. Leer `tasks/sprint_07_provider.md` — sprint actual
+4. Correr `python -m pytest tests/ -v` para verificar que los 31 tests pasen
+5. Continuar desde la primera tarea no completada
 
 ---
 
-## GitHub Issues — cómo usarlos
+## Lo que NO hacer
 
-Cada tarea del sprint tiene un issue de GitHub asociado. El agente debe:
-- Referenciar el issue en cada commit: `feat: auth layer básico (closes #3)`
-- Actualizar el issue con comentario si hay decisiones tomadas en el proceso
-- Nunca cerrar un issue sin que el código esté commiteado y los tests pasen
-
----
-
-## Lo que NO hacer (decisiones ya tomadas, no reabrir)
-
-- ❌ No implementar Solidity / smart contracts en V1
-- ❌ No agregar autenticación OAuth o JWT en V1 (API keys propias es suficiente)
-- ❌ No crear un frontend React — Jinja2 para el dashboard
-- ❌ No agregar Browserbase en C1 — Apify cubre el mismo caso de uso
-- ❌ No implementar token nativo — USDT simulado en Postgres V1
-- ❌ No optimizar performance antes de tener el flujo completo funcionando
-- ❌ No usar Redis para rate limiting en V1 — slowapi in-memory es suficiente
+- ❌ No agregar FastAPI/SQLAlchemy/Postgres — este repo no tiene base de datos propia
+- ❌ No implementar billing propio — todo el billing va via `metrify/sdk.py` → metrify-backend
+- ❌ No crear dashboard Jinja2 — era del gateway viejo, eliminado
+- ❌ No importar `assemblyai` SDK — usar httpx REST API directo (ver assemblyai_tool.py)
+- ❌ No usar `asyncio.to_thread` — Python 3.8 compat: usar `run_in_executor`
+- ❌ No usar `str | None` syntax — Python 3.8: usar `Optional[str]`

@@ -1,0 +1,80 @@
+import os
+import asyncio
+import httpx
+from metrify import UpstreamError
+
+_BASE = "https://api.assemblyai.com/v2"
+
+
+def _handle_error(e: Exception) -> str:
+    if isinstance(e, httpx.HTTPStatusError):
+        if e.response.status_code == 401:
+            return "Error: Invalid AssemblyAI API key. Check ASSEMBLYAI_API_KEY."
+        if e.response.status_code == 400:
+            return "Error: AssemblyAI rejected the request. Verify the audio URL is publicly accessible."
+        return f"Error: AssemblyAI returned status {e.response.status_code}."
+    if isinstance(e, httpx.TimeoutException):
+        return "Error: AssemblyAI request timed out. Please retry."
+    return f"Error: {type(e).__name__}: {e}"
+
+
+def register(server, m):
+    @server.tool(
+        name="assemblyai",
+        annotations={
+            "title": "AssemblyAI Audio Transcription",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    @m.tool(price=0.00617, unit="per_minute")
+    async def assemblyai(consumer_api_key: str, audio_url: str) -> str:
+        """Transcribe audio to text using AssemblyAI.
+
+        Billed at $0.00617 per minute of audio via Metrify. The audio URL must be
+        publicly accessible. Uses AssemblyAI REST API v2 directly.
+
+        Args:
+            consumer_api_key: Metrify consumer key (format: ck_...).
+            audio_url: Publicly accessible URL of the audio file to transcribe.
+
+        Returns:
+            Transcribed text string, or an error message prefixed with "Error:".
+        """
+        api_key = os.environ["ASSEMBLYAI_API_KEY"]
+        headers = {"authorization": api_key, "content-type": "application/json"}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{_BASE}/transcript",
+                    json={"audio_url": audio_url},
+                    headers=headers,
+                    timeout=30.0,
+                )
+                resp.raise_for_status()
+                transcript_id = resp.json()["id"]
+
+                while True:
+                    resp = await client.get(
+                        f"{_BASE}/transcript/{transcript_id}",
+                        headers=headers,
+                        timeout=30.0,
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    if data["status"] == "completed":
+                        return data["text"] or ""
+                    if data["status"] == "error":
+                        raise UpstreamError(
+                            f"Error: Transcription failed: {data.get('error', 'unknown error')}"
+                        )
+                    await asyncio.sleep(2)
+        except UpstreamError:
+            raise
+        except Exception as e:
+            raise UpstreamError(_handle_error(e)) from e
+
+    return assemblyai

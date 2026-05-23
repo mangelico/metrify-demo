@@ -43,3 +43,24 @@ Apify = scraping complejo/async. Firecrawl = extracción rápida de contenido de
 ## DEC-009 — Rate limiting con slowapi in-memory (no Redis)
 **Fecha:** Mayo 2026 — TASK-16  
 **Razón:** Redis agrega complejidad innecesaria en V1 con una sola instancia. slowapi in-memory es suficiente para el volumen actual. Revisitar cuando haya múltiples instancias o usuarios reales.
+
+## DEC-010 — metrify-demo pasa de gateway propio a provider de ejemplo
+**Fecha:** Mayo 2026 — Sprint 07  
+**Razón:** La arquitectura evolucionó: metrify-backend es la plataforma de billing, y metrify-demo demuestra cómo cualquier developer puede crear un provider usando el SDK. El repo gateway (con FastAPI, Postgres, MeteringService propio) quedó obsoleto con este modelo.  
+**Consecuencia:** Se eliminó src/, alembic/, demo/, y los 98 tests del gateway. Reemplazados por 31 tests del provider.
+
+## DEC-011 — Billing pre-check + post-charge (no billing-first atómico)
+**Fecha:** Mayo 2026 — Sprint 07  
+**Razón:** Para honrar "no charge on upstream error", el SDK implementa dos fases: _pre_check (verifica balance antes de llamar upstream) y _charge (debita después de éxito upstream). Si el upstream falla, _charge nunca se ejecuta. Limitación V1: si _charge falla después de upstream OK, el consumer no paga (se loguea para reconciliación manual). Solución V2: idempotency keys + webhook de confirmación.
+
+## DEC-012 — assemblyai SDK no compatible con Python 3.8 → httpx REST directo
+**Fecha:** Mayo 2026 — Sprint 07  
+**Razón:** assemblyai>=0.30 requiere typing.Annotated (Python 3.9+). El entorno local es Python 3.8.4. Se implementó assemblyai_tool.py usando httpx directo contra la REST API v2 de AssemblyAI. No hay pérdida funcional; la REST API es lo que el SDK wrappea internamente.
+
+## DEC-013 — asyncio.to_thread reemplazado por run_in_executor (Python 3.8 compat)
+**Fecha:** Mayo 2026 — Sprint 07  
+**Razón:** asyncio.to_thread fue agregado en Python 3.9. Se usa asyncio.get_running_loop().run_in_executor(None, lambda: ...) en tools que envuelven libs síncronas (apify, firecrawl). Mantener este patrón mientras Railway use Python 3.8; migrar a to_thread si se upgradea a 3.9+.
+
+## DEC-014 — Stability AI: precio fijo sdxl en V1, sd3 no soportado
+**Fecha:** Mayo 2026 — Sprint 07  
+**Razón:** sd3 tiene precio diferente ($0.035 vs $0.002 sdxl). En V1 se usa precio fijo de sdxl para todos los requests. El parámetro `model` existe en la interfaz pero no cambia el precio. V2: pricing dinámico por modelo con lookup table.
