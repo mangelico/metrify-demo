@@ -35,6 +35,7 @@ def register(server, m):
 
         Billed at $0.00617 per minute of audio via Metrify. The audio URL must be
         publicly accessible. Uses AssemblyAI REST API v2 directly.
+        Demo limits: 5 min audio max.
 
         Args:
             consumer_api_key: Metrify consumer key (format: ck_...).
@@ -66,6 +67,11 @@ def register(server, m):
                     resp.raise_for_status()
                     data = resp.json()
                     if data["status"] == "completed":
+                        audio_duration = data.get("audio_duration")
+                        if audio_duration is not None and audio_duration > 300:
+                            raise UpstreamError(
+                                "Error: Audio too long. Demo tier limit: 5 minutes."
+                            )
                         return data["text"] or ""
                     if data["status"] == "error":
                         raise UpstreamError(

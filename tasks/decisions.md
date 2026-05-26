@@ -64,3 +64,8 @@ Apify = scraping complejo/async. Firecrawl = extracción rápida de contenido de
 ## DEC-014 — Stability AI: precio fijo sdxl en V1, sd3 no soportado
 **Fecha:** Mayo 2026 — Sprint 07  
 **Razón:** sd3 tiene precio diferente ($0.035 vs $0.002 sdxl). En V1 se usa precio fijo de sdxl para todos los requests. El parámetro `model` existe en la interfaz pero no cambia el precio. V2: pricing dinámico por modelo con lookup table.
+
+
+## DEC-015 — assemblyai audio_duration: check opcional (campo puede estar ausente)
+**Fecha:** Mayo 2026  
+**Razón:** La API REST v2 de AssemblyAI incluye `audio_duration` (segundos) en el response de polling cuando `status == "completed"`. Sin embargo, el campo puede faltar en respuestas parciales o en versiones futuras de la API. La validación del límite de 5 min se aplica solo si el campo está presente (`data.get("audio_duration")`). Si ausente, se omite el check y se retorna el texto. Esto es preferible a bloquear transcripciones válidas por un campo opcional.

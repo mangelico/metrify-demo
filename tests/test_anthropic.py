@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from metrify import InsufficientBalanceError, GatewayError
+from metrify.exceptions import UpstreamError
 
 
 @pytest.fixture
@@ -49,3 +50,25 @@ async def test_anthropic_api_failure_no_charge(anthropic_fn, mock_m):
 
     assert result.startswith("Error:")
     mock_m._billing.charge.assert_not_called()
+
+
+async def test_anthropic_prompt_too_long(anthropic_fn, mock_m):
+    long_prompt = "x" * 2001
+    result = await anthropic_fn("ck_test", long_prompt)
+    assert result.startswith("Error:")
+    assert "2000" in result
+    mock_m._billing.charge.assert_not_called()
+
+
+async def test_anthropic_max_tokens_capped(anthropic_fn, mock_m):
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text="response")]
+
+    with patch("anthropic.AsyncAnthropic") as mock_cls:
+        mock_cls.return_value.messages.create = AsyncMock(return_value=mock_response)
+        result = await anthropic_fn("ck_test", "Hello!", max_tokens=1000)
+
+    assert result == "response"
+    call_kwargs = mock_cls.return_value.messages.create.call_args.kwargs
+    assert call_kwargs["max_tokens"] == 512
+    mock_m._billing.charge.assert_called_once()

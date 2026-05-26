@@ -69,3 +69,28 @@ async def test_assemblyai_transcription_error_no_charge(assemblyai_fn, mock_m):
 
     assert result.startswith("Error:")
     mock_m._billing.charge.assert_not_called()
+
+
+async def test_assemblyai_duration_too_long(assemblyai_fn, mock_m):
+    ctx = _http_mock(
+        post_data={"id": "tx_abc123"},
+        get_data={"status": "completed", "text": "...", "audio_duration": 301},
+    )
+    with patch("httpx.AsyncClient", return_value=ctx):
+        result = await assemblyai_fn("ck_test", "https://example.com/long.mp3")
+
+    assert result.startswith("Error:")
+    assert "5 minutes" in result
+    mock_m._billing.charge.assert_not_called()
+
+
+async def test_assemblyai_duration_missing_skips_check(assemblyai_fn, mock_m):
+    ctx = _http_mock(
+        post_data={"id": "tx_abc123"},
+        get_data={"status": "completed", "text": "ok"},
+    )
+    with patch("httpx.AsyncClient", return_value=ctx):
+        result = await assemblyai_fn("ck_test", "https://example.com/audio.mp3")
+
+    assert result == "ok"
+    mock_m._billing.charge.assert_called_once()

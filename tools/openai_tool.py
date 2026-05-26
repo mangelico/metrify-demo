@@ -33,15 +33,21 @@ def register(server, m):
 
         Billed at $0.000010 per token via Metrify. The consumer is charged only
         if the upstream call succeeds.
+        Demo limits: 2000 char prompt, 512 token response.
 
         Args:
             consumer_api_key: Metrify consumer key (format: ck_...).
             prompt: Text prompt to send to the model.
-            max_tokens: Maximum tokens in the response (default 1024).
+            max_tokens: Maximum tokens in the response (default 1024, capped at 512).
 
         Returns:
             Generated text string, or an error message prefixed with "Error:" on failure.
         """
+        if len(prompt) > 2000:
+            raise UpstreamError(
+                f"Error: Prompt too long ({len(prompt)} chars). Demo tier limit: 2000 chars (~500 tokens)."
+            )
+        max_tokens = min(max_tokens, 512)
         try:
             client = openai_client.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
             response = await client.chat.completions.create(
