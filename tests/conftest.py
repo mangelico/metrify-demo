@@ -1,6 +1,6 @@
 import os
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 os.environ.setdefault("METRIFY_PROVIDER_KEY", "pk_test_xxx")
 os.environ.setdefault("METRIFY_GATEWAY_URL", "http://localhost:9999")
@@ -28,4 +28,5 @@ def mock_m():
     m = Metrify()
     m._billing.check_balance = MagicMock()
     m._billing.charge = MagicMock()
+    m.register_tools = AsyncMock()
     return m

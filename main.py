@@ -1,13 +1,22 @@
 import os
 import uvicorn
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from metrify import Metrify
 
 load_dotenv()
 
-m = Metrify()
-server = FastMCP("metrify_demo_mcp")
+m = Metrify(mcp_url="https://web-production-b51ff.up.railway.app/mcp")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    await m.register_tools()
+    yield
+
+
+server = FastMCP("metrify_demo_mcp", lifespan=lifespan)
 
 from tools.anthropic_tool import register as register_anthropic
 from tools.openai_tool import register as register_openai
