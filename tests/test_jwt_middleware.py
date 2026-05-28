@@ -1,9 +1,14 @@
 """
 Tests for JWT Bearer middleware and dual-auth tool behavior.
 
+Tokens are signed with a real RSA-2048 key pair generated at module load.
+The validator fixture has its _public_key pre-populated — no JWKS HTTP call.
+
 Covers:
-  - Middleware: expired JWT → 401, invalid JWT → 401, no header → passthrough
-  - Tools: JWT sets consumer key, param fallback, JWT priority, no-auth error string
+  - Middleware: expired JWT → 401, invalid JWT → 401, wrong audience → 401,
+                no header → passthrough, valid JWT → ContextVar set
+  - Option A: multi-audience token accepted
+  - Tools: JWT resolves key, param fallback, JWT priority, no-auth error string
 """
 import json
 import time
@@ -11,21 +16,30 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt as pyjwt
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 from auth.middleware import BearerMiddleware, _current_consumer_key
 from auth.jwt_validator import JWTValidator
 
-_SECRET = "test-secret-for-tests-only"
+# ── RSA key pair generated once for the entire test module ────────────────────
+
+_PRIVATE_KEY = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    backend=default_backend(),
+)
+_PUBLIC_KEY = _PRIVATE_KEY.public_key()
 _ISSUER = "metrify-backend"
 
 
 def _make_token(
     sub: str = "ck_from_jwt",
     exp_offset: int = 3600,
-    aud: str = "metrify-demo",
-    secret: str = _SECRET,
+    aud = "metrify",
 ) -> str:
-    """Mint a signed test JWT."""
+    """Mint a test JWT signed with the module-level RSA private key."""
     payload = {
         "sub": sub,
         "aud": aud,
@@ -33,12 +47,15 @@ def _make_token(
         "exp": int(time.time()) + exp_offset,
         "iss": _ISSUER,
     }
-    return pyjwt.encode(payload, secret, algorithm="HS256")
+    return pyjwt.encode(payload, _PRIVATE_KEY, algorithm="RS256")
 
 
 @pytest.fixture
 def validator():
-    return JWTValidator(secret=_SECRET, issuer=_ISSUER)
+    """JWTValidator with public key pre-injected — no JWKS HTTP call."""
+    v = JWTValidator(backend_url="http://test-backend", issuer=_ISSUER)
+    v._public_key = _PUBLIC_KEY  # bypass _get_public_key() fetch
+    return v
 
 
 @pytest.fixture
@@ -82,6 +99,23 @@ async def test_invalid_jwt_returns_401(validator):
     call_next.assert_not_called()
 
 
+async def test_wrong_audience_jwt_returns_401(validator):
+    """JWT with a different audience → 401."""
+    token = _make_token(aud="some-other-service")
+
+    middleware = BearerMiddleware(AsyncMock(), validator=validator)
+    request = MagicMock()
+    request.headers = {"Authorization": f"Bearer {token}"}
+    call_next = AsyncMock()
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response.status_code == 401
+    body = json.loads(response.body)
+    assert body["error"] == "invalid_token"
+    call_next.assert_not_called()
+
+
 async def test_no_bearer_passes_through(validator):
     """No Authorization header → middleware passes through to next handler."""
     mock_response = MagicMock()
@@ -97,7 +131,7 @@ async def test_no_bearer_passes_through(validator):
 
 
 async def test_valid_jwt_sets_context_var_and_passes_through(validator):
-    """Valid JWT → _current_consumer_key is populated AND call_next is called."""
+    """Valid JWT → _current_consumer_key populated AND call_next invoked."""
     token = _make_token(sub="ck_valid_consumer")
     mock_response = MagicMock()
     middleware = BearerMiddleware(AsyncMock(), validator=validator)
@@ -115,6 +149,27 @@ async def test_valid_jwt_sets_context_var_and_passes_through(validator):
 
     assert response is mock_response
     assert captured_key == "ck_valid_consumer"
+
+
+async def test_option_a_multi_audience_token_accepted(validator):
+    """Option A: token with aud=[metrify, metrify-mcp] is accepted."""
+    token = _make_token(aud=["metrify", "metrify-mcp"])
+    mock_response = MagicMock()
+    middleware = BearerMiddleware(AsyncMock(), validator=validator)
+    request = MagicMock()
+    request.headers = {"Authorization": f"Bearer {token}"}
+
+    captured_key = None
+
+    async def capturing_call_next(req):
+        nonlocal captured_key
+        captured_key = _current_consumer_key.get()
+        return mock_response
+
+    response = await middleware.dispatch(request, capturing_call_next)
+
+    assert response is mock_response
+    assert captured_key == "ck_from_jwt"
 
 
 # ── Tool dual-auth behavior ────────────────────────────────────────────────────
@@ -169,7 +224,6 @@ async def test_jwt_takes_priority_over_param(anthropic_fn, mock_m):
             result = await anthropic_fn("Hello!", consumer_api_key="ck_from_param")
 
         assert result == "JWT wins"
-        # Billing must use the JWT key, not the parameter
         mock_m._billing.check_balance.assert_called_once_with(
             consumer_api_key="ck_from_jwt", required=0.000065
         )
@@ -179,46 +233,9 @@ async def test_jwt_takes_priority_over_param(anthropic_fn, mock_m):
 
 async def test_no_auth_returns_error_message(anthropic_fn, mock_m):
     """No JWT + no consumer_api_key → friendly error string, no crash, no charge."""
-    result = await anthropic_fn("Hello!")  # no consumer_api_key, ContextVar is None
+    result = await anthropic_fn("Hello!")
 
     assert "Error:" in result
     assert "autenticación" in result
     mock_m._billing.check_balance.assert_not_called()
     mock_m._billing.charge.assert_not_called()
-
-
-async def test_wrong_audience_jwt_returns_401(validator):
-    """JWT with audience for a different service → 401."""
-    token = _make_token(aud="some-other-service")
-    middleware = BearerMiddleware(AsyncMock(), validator=validator)
-    request = MagicMock()
-    request.headers = {"Authorization": f"Bearer {token}"}
-    call_next = AsyncMock()
-
-    response = await middleware.dispatch(request, call_next)
-
-    assert response.status_code == 401
-    body = json.loads(response.body)
-    assert body["error"] == "invalid_token"
-    call_next.assert_not_called()
-
-
-async def test_option_a_multi_audience_token_accepted(validator):
-    """Option A: token with aud=[metrify-mcp, metrify-demo] is accepted."""
-    token = _make_token(aud=["metrify-mcp", "metrify-demo"])
-    mock_response = MagicMock()
-    middleware = BearerMiddleware(AsyncMock(), validator=validator)
-    request = MagicMock()
-    request.headers = {"Authorization": f"Bearer {token}"}
-
-    captured_key = None
-
-    async def capturing_call_next(req):
-        nonlocal captured_key
-        captured_key = _current_consumer_key.get()
-        return mock_response
-
-    response = await middleware.dispatch(request, capturing_call_next)
-
-    assert response is mock_response
-    assert captured_key == "ck_from_jwt"

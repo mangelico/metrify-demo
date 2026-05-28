@@ -1,37 +1,48 @@
 """
 JWT validator for metrify-demo Bearer authentication.
 
-Validates JWT tokens issued by metrify-backend using HS256 (shared secret).
+Validates JWT tokens issued by metrify-backend using RS256 (asymmetric).
+The public key is fetched once from the backend's JWKS endpoint and cached
+in memory — no shared secret required.
 
-Option A audience: accepts tokens where "metrify-demo" is one of the audiences.
-The backend issues aud=["metrify-mcp", "metrify-demo"] so the same token works
-for both MCP servers. In V2 this can be restricted to metrify-demo only.
+RS256 vs HS256:
+  HS256 (old) — every provider needs the same JWT_SECRET; secret distribution
+                is a security risk in an open multi-provider network.
+  RS256 (this) — metrify-demo only needs the public key, which is non-secret
+                 and published at /oauth/jwks.json. Any provider can validate
+                 tokens without ever touching a private key.
 
 Environment variables:
-    JWT_SECRET  — shared secret for HS256 signature verification
-    JWT_ISSUER  — expected issuer claim (optional; skipped if not set)
+    METRIFY_BACKEND_URL  — base URL of metrify-backend
+                           (e.g. https://airy-wholeness-production-fcc4.up.railway.app)
+    JWT_ISSUER           — expected issuer claim (optional; skipped if not set)
 """
+import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
+import httpx
 import jwt
+from jwt.algorithms import RSAAlgorithm
 
 
-# This service's audience claim.
-# Option A: the backend emits aud=["metrify-mcp", "metrify-demo"] for a single
-# token valid at both MCP servers. PyJWT validates that THIS_AUDIENCE is
-# present in the token's aud field — so aud=["metrify-mcp", "metrify-demo"]
-# passes when we require "metrify-demo".
-THIS_AUDIENCE = "metrify-demo"
+# Audience expected in every token issued by metrify-backend.
+THIS_AUDIENCE = "metrify"
+
+# JWKS path relative to METRIFY_BACKEND_URL.
+JWKS_PATH = "/oauth/jwks.json"
 
 
 class JWTValidator:
-    """Validates Bearer JWT tokens.
+    """Validates Bearer JWT tokens using RS256 + JWKS.
 
     Usage:
-        validator = JWTValidator()  # reads JWT_SECRET / JWT_ISSUER from env
+        validator = JWTValidator()       # reads env vars
         payload = await validator.validate(token_string)
-        consumer_key = payload["sub"]  # Metrify consumer api_key
+        consumer_key = payload["sub"]    # Metrify consumer api_key
+
+    The public key is fetched from the backend JWKS endpoint on first use
+    and cached for the lifetime of the instance. No shared secret is needed.
 
     Raises:
         jwt.ExpiredSignatureError  — token has expired (caller returns 401)
@@ -40,13 +51,42 @@ class JWTValidator:
 
     def __init__(
         self,
-        secret: Optional[str] = None,
+        backend_url: Optional[str] = None,
         issuer: Optional[str] = None,
-        algorithms: Optional[List[str]] = None,
     ) -> None:
-        self._secret: str = secret or os.environ.get("JWT_SECRET", "")
+        self._backend_url: str = (
+            backend_url or os.environ.get("METRIFY_BACKEND_URL", "")
+        ).rstrip("/")
         self._issuer: Optional[str] = issuer or os.environ.get("JWT_ISSUER") or None
-        self._algorithms: List[str] = algorithms or ["HS256"]
+        self._public_key: Any = None  # cached after first JWKS fetch
+
+    async def _get_public_key(self) -> Any:
+        """Fetch the RSA public key from the backend JWKS endpoint (cached).
+
+        Fetches {METRIFY_BACKEND_URL}/oauth/jwks.json on first call,
+        parses the first RSA key with RSAAlgorithm.from_jwk(), and caches it.
+
+        Returns:
+            RSA public key object usable by PyJWT.
+
+        Raises:
+            httpx.HTTPError: JWKS endpoint unreachable or returned an error.
+            KeyError / ValueError: JWKS response is malformed.
+        """
+        if self._public_key is not None:
+            return self._public_key
+
+        url = f"{self._backend_url}{JWKS_PATH}"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=10.0)
+            resp.raise_for_status()
+            jwks = resp.json()
+
+        # Use the first RSA key in the set.
+        # V2: match by `kid` header in the incoming token for key rotation support.
+        key_data = jwks["keys"][0]
+        self._public_key = RSAAlgorithm.from_jwk(json.dumps(key_data))
+        return self._public_key
 
     async def validate(self, token: str) -> Dict[str, Any]:
         """Validate a JWT Bearer token and return the decoded payload.
@@ -61,16 +101,14 @@ class JWTValidator:
             jwt.ExpiredSignatureError: Token has expired.
             jwt.PyJWTError: Token is invalid (bad signature, wrong audience, etc.).
         """
+        public_key = await self._get_public_key()
+
         decode_kwargs: Dict[str, Any] = {
-            "algorithms": self._algorithms,
+            "algorithms": ["RS256"],
             "audience": THIS_AUDIENCE,
         }
         if self._issuer:
             decode_kwargs["issuer"] = self._issuer
 
-        payload: Dict[str, Any] = jwt.decode(
-            token,
-            self._secret,
-            **decode_kwargs,
-        )
+        payload: Dict[str, Any] = jwt.decode(token, public_key, **decode_kwargs)
         return payload

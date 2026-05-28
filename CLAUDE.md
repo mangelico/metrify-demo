@@ -55,7 +55,7 @@ Flujo de cada tool call:
 metrify-demo/
   auth/                 ← OAuth Bearer JWT auth (TASK-OAuth-02b)
     __init__.py         ← exporta JWTValidator, BearerMiddleware, _current_consumer_key
-    jwt_validator.py    ← JWTValidator: valida HS256 JWT contra JWT_SECRET/JWT_ISSUER
+    jwt_validator.py    ← JWTValidator: RS256, fetch public key de METRIFY_BACKEND_URL/oauth/jwks.json
     middleware.py       ← BearerMiddleware (Starlette) + _current_consumer_key ContextVar
   metrify/              ← SDK local del billing (instalado vía pip)
     __init__.py         ← exporta Metrify
@@ -93,7 +93,7 @@ Cada tool soporta dos formas de identificar al consumer:
 
 | Flujo | Cómo llega la key | Prioridad |
 |---|---|---|
-| **OAuth (Bearer JWT)** | Header `Authorization: Bearer <token>` → middleware extrae `sub` del JWT | Alta — si JWT válido, el parámetro se ignora |
+| **OAuth (Bearer JWT)** | Header `Authorization: Bearer <token>` → RS256 verificado contra JWKS → `sub` del payload | Alta — si JWT válido, el parámetro se ignora |
 | **Legacy (parámetro)** | `consumer_api_key` como último kwarg opcional de la tool | Baja — usado solo si no hay JWT |
 
 ```
@@ -173,8 +173,8 @@ APIFY_API_KEY          → ...
 FIRECRAWL_API_KEY      → ...
 PORT                   → 8000 (Railway lo setea automáticamente)
 
-# JWT / OAuth Bearer auth (TASK-OAuth-02b)
-JWT_SECRET             → shared secret HS256 con metrify-backend
+# JWT / OAuth Bearer auth (TASK-OAuth-02b — RS256, sin secreto compartido)
+METRIFY_BACKEND_URL    → URL base del backend (usado para fetch de JWKS)
 JWT_ISSUER             → issuer esperado, ej: "metrify-backend" (opcional)
 ```
 
