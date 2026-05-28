@@ -71,7 +71,7 @@ async def test_billing_correct_price_anthropic(m):
     mock_resp.content = [MagicMock(text="hi")]
     with patch("anthropic.AsyncAnthropic") as cls:
         cls.return_value.messages.create = AM(return_value=mock_resp)
-        await fn("ck_test", "hi")
+        await fn("hi", consumer_api_key="ck_test")
 
     m._billing.check_balance.assert_called_once()
     assert m._billing.check_balance.call_args.kwargs["required"] == 0.000065
@@ -90,7 +90,7 @@ async def test_billing_correct_price_stability(m):
         cls.return_value.__aenter__ = AM(return_value=cls.return_value)
         cls.return_value.__aexit__ = AM(return_value=False)
         cls.return_value.post = AM(return_value=mock_resp)
-        await fn("ck_test", "a dog")
+        await fn("a dog", consumer_api_key="ck_test")
 
     m._billing.check_balance.assert_called_once()
     assert m._billing.check_balance.call_args.kwargs["required"] == 0.002

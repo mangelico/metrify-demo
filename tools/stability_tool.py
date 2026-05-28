@@ -1,6 +1,7 @@
 import os
 import httpx
 from metrify import UpstreamError
+from auth.middleware import _current_consumer_key
 
 
 def _handle_error(e: Exception) -> str:
@@ -18,31 +19,9 @@ def _handle_error(e: Exception) -> str:
 
 
 def register(server, m):
-    @server.tool(
-        name="stability",
-        annotations={
-            "title": "Stability AI Image Generation",
-            "readOnlyHint": False,
-            "destructiveHint": False,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-    )
+    # Inner: billing-wrapped. tool_name="stability" from func.__name__.
     @m.tool(price=0.002, unit="per_image")
     async def stability(consumer_api_key: str, prompt: str, model: str = "sdxl") -> str:
-        """Generate an image using Stability AI SDXL and return it as base64.
-
-        Billed at $0.002 per image via Metrify. V1 limitation: price is fixed for
-        sdxl regardless of the `model` parameter — sd3 ($0.035) is not yet supported.
-
-        Args:
-            consumer_api_key: Metrify consumer key (format: ck_...).
-            prompt: Text description of the image to generate.
-            model: Model hint (default "sdxl"). Note: only sdxl pricing in V1.
-
-        Returns:
-            Base64-encoded PNG image string, or an error message prefixed with "Error:".
-        """
         api_key = os.environ["STABILITY_API_KEY"]
         try:
             async with httpx.AsyncClient() as client:
@@ -69,4 +48,45 @@ def register(server, m):
         except Exception as e:
             raise UpstreamError(_handle_error(e)) from e
 
-    return stability
+    _billed = stability
+
+    # Outer: MCP-facing. consumer_api_key optional (JWT or param).
+    @server.tool(
+        name="stability",
+        annotations={
+            "title": "Stability AI Image Generation",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    async def stability_mcp(
+        prompt: str,
+        model: str = "sdxl",
+        consumer_api_key: str = "",
+    ) -> str:
+        """Generate an image using Stability AI SDXL and return it as base64.
+
+        Billed at $0.002 per image via Metrify. V1 limitation: price is fixed for
+        sdxl regardless of the `model` parameter — sd3 ($0.035) is not yet supported.
+
+        Args:
+            prompt: Text description of the image to generate.
+            model: Model hint (default "sdxl"). Note: only sdxl pricing in V1.
+            consumer_api_key: Metrify consumer key (format: ck_...). Optional when
+                using OAuth Bearer JWT — the key is read from the token instead.
+
+        Returns:
+            Base64-encoded PNG image string, or an error message prefixed with "Error:".
+        """
+        resolved_key = _current_consumer_key.get() or consumer_api_key
+        if not resolved_key:
+            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+        return await _billed(
+            consumer_api_key=resolved_key,
+            prompt=prompt,
+            model=model,
+        )
+
+    return stability_mcp

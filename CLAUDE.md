@@ -45,7 +45,7 @@ Flujo de cada tool call:
 | MCP Server | FastMCP (mcp>=1.9.0) |
 | Billing SDK | `metrify/` (local, llama metrify-backend via httpx) |
 | Hosting | Railway — https://web-production-b51ff.up.railway.app |
-| Tests | pytest + pytest-asyncio, 31 tests |
+| Tests | pytest + pytest-asyncio, 47 tests |
 
 ---
 
@@ -53,28 +53,33 @@ Flujo de cada tool call:
 
 ```
 metrify-demo/
-  metrify/              ← SDK local del billing
+  auth/                 ← OAuth Bearer JWT auth (TASK-OAuth-02b)
+    __init__.py         ← exporta JWTValidator, BearerMiddleware, _current_consumer_key
+    jwt_validator.py    ← JWTValidator: valida HS256 JWT contra JWT_SECRET/JWT_ISSUER
+    middleware.py       ← BearerMiddleware (Starlette) + _current_consumer_key ContextVar
+  metrify/              ← SDK local del billing (instalado vía pip)
     __init__.py         ← exporta Metrify
     exceptions.py       ← InsufficientBalanceError, GatewayError
     sdk.py              ← Metrify class: _pre_check, _charge, .tool() decorator
   tools/
     __init__.py
-    anthropic_tool.py   ← register(server, m) → @server.tool() @m.tool()
+    anthropic_tool.py   ← dos capas: inner @m.tool() + outer @server.tool() con key opcional
     openai_tool.py
     stability_tool.py
     assemblyai_tool.py  ← usa httpx REST (no SDK, incompatible Python 3.8)
     apify_tool.py       ← usa run_in_executor (Python 3.8 compat)
     firecrawl_tool.py   ← usa run_in_executor (Python 3.8 compat)
-  main.py               ← FastMCP server, registra las 6 tools, uvicorn
+  main.py               ← FastMCP server + BearerMiddleware, registra las 6 tools, uvicorn
   tests/
     conftest.py         ← mock_server (passthrough) + mock_m (Metrify con _pre_check/_charge mockeados)
-    test_anthropic.py   ← 4 tests
-    test_openai.py      ← 4 tests
+    test_anthropic.py   ← 6 tests
+    test_openai.py      ← 6 tests
     test_stability.py   ← 4 tests
-    test_assemblyai.py  ← 4 tests
+    test_assemblyai.py  ← 6 tests
     test_apify.py       ← 4 tests
     test_firecrawl.py   ← 4 tests
     test_billing.py     ← 7 tests (verifica el SDK decorator)
+    test_jwt_middleware.py ← 10 tests (middleware + dual-auth tool behavior)
   tasks/
     decisions.md
     sprint_07_provider.md  ← este refactor
@@ -82,23 +87,63 @@ metrify-demo/
 
 ---
 
-## Patrón de cada tool — doble decorator
+## Autenticación dual — OAuth Bearer JWT y parámetro legacy
+
+Cada tool soporta dos formas de identificar al consumer:
+
+| Flujo | Cómo llega la key | Prioridad |
+|---|---|---|
+| **OAuth (Bearer JWT)** | Header `Authorization: Bearer <token>` → middleware extrae `sub` del JWT | Alta — si JWT válido, el parámetro se ignora |
+| **Legacy (parámetro)** | `consumer_api_key` como último kwarg opcional de la tool | Baja — usado solo si no hay JWT |
+
+```
+BearerMiddleware
+    ↓ Authorization: Bearer <jwt>
+    ↓ JWTValidator.validate(token)
+    ↓ _current_consumer_key.set(payload["sub"])
+    ↓
+tool(prompt, ..., consumer_api_key="")
+    resolved_key = _current_consumer_key.get() or consumer_api_key
+```
+
+Audience Option A: el backend emite `aud=["metrify-mcp", "metrify-demo"]` — el mismo
+token funciona en ambos MCP servers. En V2 se puede restringir por audience.
+
+Variables de entorno del módulo `auth/`:
+```
+JWT_SECRET    → shared secret HS256 entre metrify-backend y metrify-demo
+JWT_ISSUER    → issuer esperado (opcional, ej: "metrify-backend")
+```
+
+---
+
+## Patrón de cada tool — dos capas
 
 ```python
 def register(server, m):
-    @server.tool()
+    # Capa interna: billing-wrapped. consumer_api_key como primer arg (SDK compat).
     @m.tool(price=0.000065, unit="per_token")
     async def anthropic(consumer_api_key: str, prompt: str, max_tokens: int = 1024) -> str:
-        # billing ocurre en @m.tool ANTES y DESPUÉS de este código
-        ...
-    return anthropic
+        ...  # llama la API upstream
+    _billed = anthropic
+
+    # Capa externa: MCP-facing. consumer_api_key opcional al final.
+    # El SDK extrae la key vía kwargs cuando llamamos _billed(consumer_api_key=...).
+    @server.tool(name="anthropic", annotations={...})
+    async def anthropic_mcp(prompt: str, max_tokens: int = 1024, consumer_api_key: str = "") -> str:
+        resolved_key = _current_consumer_key.get() or consumer_api_key
+        if not resolved_key:
+            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+        return await _billed(consumer_api_key=resolved_key, prompt=prompt, max_tokens=max_tokens)
+    return anthropic_mcp
 ```
 
 **CRÍTICO:**
-- `consumer_api_key` SIEMPRE es el primer parámetro
-- `@m.tool` va DEBAJO de `@server.tool()`
+- Capa interna: `consumer_api_key` SIEMPRE primer parámetro (compatibilidad con SDK)
+- Capa externa: `consumer_api_key` al FINAL como kwarg opcional (default `""`)
 - Billing es: pre_check (antes) → upstream call → charge (si upstream OK)
 - Si upstream falla → NO se cobra (tool error retorna string, charge no ejecuta)
+- Sin ninguna auth → error string amigable, NO crash, NO charge
 
 ---
 
@@ -127,6 +172,10 @@ ASSEMBLYAI_API_KEY     → ...
 APIFY_API_KEY          → ...
 FIRECRAWL_API_KEY      → ...
 PORT                   → 8000 (Railway lo setea automáticamente)
+
+# JWT / OAuth Bearer auth (TASK-OAuth-02b)
+JWT_SECRET             → shared secret HS256 con metrify-backend
+JWT_ISSUER             → issuer esperado, ej: "metrify-backend" (opcional)
 ```
 
 ---

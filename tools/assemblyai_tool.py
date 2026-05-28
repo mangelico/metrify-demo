@@ -2,6 +2,7 @@ import os
 import asyncio
 import httpx
 from metrify import UpstreamError
+from auth.middleware import _current_consumer_key
 
 _BASE = "https://api.assemblyai.com/v2"
 
@@ -19,31 +20,9 @@ def _handle_error(e: Exception) -> str:
 
 
 def register(server, m):
-    @server.tool(
-        name="assemblyai",
-        annotations={
-            "title": "AssemblyAI Audio Transcription",
-            "readOnlyHint": False,
-            "destructiveHint": False,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-    )
+    # Inner: billing-wrapped. tool_name="assemblyai" from func.__name__.
     @m.tool(price=0.00617, unit="per_minute")
     async def assemblyai(consumer_api_key: str, audio_url: str) -> str:
-        """Transcribe audio to text using AssemblyAI.
-
-        Billed at $0.00617 per minute of audio via Metrify. The audio URL must be
-        publicly accessible. Uses AssemblyAI REST API v2 directly.
-        Demo limits: 5 min audio max.
-
-        Args:
-            consumer_api_key: Metrify consumer key (format: ck_...).
-            audio_url: Publicly accessible URL of the audio file to transcribe.
-
-        Returns:
-            Transcribed text string, or an error message prefixed with "Error:".
-        """
         api_key = os.environ["ASSEMBLYAI_API_KEY"]
         headers = {"authorization": api_key, "content-type": "application/json"}
 
@@ -83,4 +62,43 @@ def register(server, m):
         except Exception as e:
             raise UpstreamError(_handle_error(e)) from e
 
-    return assemblyai
+    _billed = assemblyai
+
+    # Outer: MCP-facing. consumer_api_key optional (JWT or param).
+    @server.tool(
+        name="assemblyai",
+        annotations={
+            "title": "AssemblyAI Audio Transcription",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    async def assemblyai_mcp(
+        audio_url: str,
+        consumer_api_key: str = "",
+    ) -> str:
+        """Transcribe audio to text using AssemblyAI.
+
+        Billed at $0.00617 per minute of audio via Metrify. The audio URL must be
+        publicly accessible. Uses AssemblyAI REST API v2 directly.
+        Demo limits: 5 min audio max.
+
+        Args:
+            audio_url: Publicly accessible URL of the audio file to transcribe.
+            consumer_api_key: Metrify consumer key (format: ck_...). Optional when
+                using OAuth Bearer JWT — the key is read from the token instead.
+
+        Returns:
+            Transcribed text string, or an error message prefixed with "Error:".
+        """
+        resolved_key = _current_consumer_key.get() or consumer_api_key
+        if not resolved_key:
+            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+        return await _billed(
+            consumer_api_key=resolved_key,
+            audio_url=audio_url,
+        )
+
+    return assemblyai_mcp

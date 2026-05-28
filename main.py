@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from metrify import Metrify
 
+from auth.jwt_validator import JWTValidator
+from auth.middleware import BearerMiddleware
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +31,9 @@ register_assemblyai(server, m)
 register_apify(server, m)
 register_firecrawl(server, m)
 
+# JWT validator: reads JWT_SECRET and JWT_ISSUER from environment.
+jwt_validator = JWTValidator()
+
 if __name__ == "__main__":
     try:
         result = asyncio.run(m.register_tools())
@@ -36,4 +42,6 @@ if __name__ == "__main__":
         logger.warning("register_tools failed (server still starting): %s", exc)
 
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(server.streamable_http_app(), host="0.0.0.0", port=port)
+    base_app = server.streamable_http_app()
+    app = BearerMiddleware(base_app, validator=jwt_validator)
+    uvicorn.run(app, host="0.0.0.0", port=port)
