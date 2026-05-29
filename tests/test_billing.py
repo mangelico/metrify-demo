@@ -65,13 +65,18 @@ async def test_billing_correct_price_anthropic(m):
     s = passthrough_server()
     from tools.anthropic_tool import register
     from unittest.mock import patch, AsyncMock as AM
+    from auth.middleware import _current_consumer_key
 
     fn = register(s, m)
     mock_resp = MagicMock()
     mock_resp.content = [MagicMock(text="hi")]
-    with patch("anthropic.AsyncAnthropic") as cls:
-        cls.return_value.messages.create = AM(return_value=mock_resp)
-        await fn("hi", consumer_api_key="ck_test")
+    tok = _current_consumer_key.set("ck_test")
+    try:
+        with patch("anthropic.AsyncAnthropic") as cls:
+            cls.return_value.messages.create = AM(return_value=mock_resp)
+            await fn("hi")
+    finally:
+        _current_consumer_key.reset(tok)
 
     m._billing.check_balance.assert_called_once()
     assert m._billing.check_balance.call_args.kwargs["required"] == 0.000065
@@ -81,16 +86,21 @@ async def test_billing_correct_price_stability(m):
     s = passthrough_server()
     from tools.stability_tool import register
     from unittest.mock import patch, AsyncMock as AM
+    from auth.middleware import _current_consumer_key
 
     fn = register(s, m)
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"artifacts": [{"base64": "x"}]}
     mock_resp.raise_for_status = MagicMock()
-    with patch("httpx.AsyncClient") as cls:
-        cls.return_value.__aenter__ = AM(return_value=cls.return_value)
-        cls.return_value.__aexit__ = AM(return_value=False)
-        cls.return_value.post = AM(return_value=mock_resp)
-        await fn("a dog", consumer_api_key="ck_test")
+    tok = _current_consumer_key.set("ck_test")
+    try:
+        with patch("httpx.AsyncClient") as cls:
+            cls.return_value.__aenter__ = AM(return_value=cls.return_value)
+            cls.return_value.__aexit__ = AM(return_value=False)
+            cls.return_value.post = AM(return_value=mock_resp)
+            await fn("a dog")
+    finally:
+        _current_consumer_key.reset(tok)
 
     m._billing.check_balance.assert_called_once()
     assert m._billing.check_balance.call_args.kwargs["required"] == 0.002

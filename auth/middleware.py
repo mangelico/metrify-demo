@@ -51,28 +51,35 @@ class BearerMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:]
-            try:
-                payload = await self._validator.validate(token)
-                _current_consumer_key.set(payload["sub"])
-            except jwt.ExpiredSignatureError:
-                return JSONResponse(
-                    {
-                        "error": "token_expired",
-                        "message": (
-                            "Token OAuth expirado. Re-autenticá en Claude Desktop."
-                        ),
-                    },
-                    status_code=401,
-                )
-            except jwt.PyJWTError:
-                return JSONResponse(
-                    {
-                        "error": "invalid_token",
-                        "message": "Token OAuth inválido.",
-                    },
-                    status_code=401,
-                )
+        if not auth.startswith("Bearer "):
+            return JSONResponse(
+                {
+                    "error": "unauthorized",
+                    "message": "Bearer token required",
+                },
+                status_code=401,
+            )
+        token = auth[7:]
+        try:
+            payload = await self._validator.validate(token)
+            _current_consumer_key.set(payload["sub"])
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(
+                {
+                    "error": "token_expired",
+                    "message": (
+                        "Token OAuth expirado. Re-autenticá en Claude Desktop."
+                    ),
+                },
+                status_code=401,
+            )
+        except jwt.PyJWTError:
+            return JSONResponse(
+                {
+                    "error": "invalid_token",
+                    "message": "Token OAuth inválido.",
+                },
+                status_code=401,
+            )
         response = await call_next(request)
         return response

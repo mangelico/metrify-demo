@@ -30,3 +30,17 @@ def mock_m():
     m._billing.charge = MagicMock()
     m.register_tools = AsyncMock()
     return m
+
+
+@pytest.fixture
+def with_ck():
+    """Set _current_consumer_key to 'ck_test' for the duration of the test.
+
+    All tool tests need this because consumer_api_key was removed from the
+    outer MCP-facing function — the key now comes exclusively from the JWT
+    ContextVar set by BearerMiddleware.
+    """
+    from auth.middleware import _current_consumer_key
+    tok = _current_consumer_key.set("ck_test")
+    yield
+    _current_consumer_key.reset(tok)

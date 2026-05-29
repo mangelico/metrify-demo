@@ -5,10 +5,10 @@ Tokens are signed with a real RSA-2048 key pair generated at module load.
 The validator fixture has its _public_key pre-populated — no JWKS HTTP call.
 
 Covers:
-  - Middleware: expired JWT → 401, invalid JWT → 401, wrong audience → 401,
-                no header → passthrough, valid JWT → ContextVar set
+  - Middleware: no header → 401, expired JWT → 401, invalid JWT → 401,
+                wrong audience → 401, valid JWT → ContextVar set
   - Option A: multi-audience token accepted
-  - Tools: JWT resolves key, param fallback, JWT priority, no-auth error string
+  - Tools: JWT resolves key, no-auth guard (defensive), JWT billing path
 """
 import json
 import time
@@ -18,7 +18,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import jwt as pyjwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
 
 from auth.middleware import BearerMiddleware, _current_consumer_key
 from auth.jwt_validator import JWTValidator
@@ -37,7 +36,7 @@ _ISSUER = "metrify-backend"
 def _make_token(
     sub: str = "ck_from_jwt",
     exp_offset: int = 3600,
-    aud = "metrify",
+    aud="metrify",
 ) -> str:
     """Mint a test JWT signed with the module-level RSA private key."""
     payload = {
@@ -54,7 +53,7 @@ def _make_token(
 def validator():
     """JWTValidator with public key pre-injected — no JWKS HTTP call."""
     v = JWTValidator(backend_url="http://test-backend", issuer=_ISSUER)
-    v._public_key = _PUBLIC_KEY  # bypass _get_public_key() fetch
+    v._public_key = _PUBLIC_KEY
     return v
 
 
@@ -67,9 +66,39 @@ def anthropic_fn(mock_server, mock_m):
 # ── Middleware unit tests ──────────────────────────────────────────────────────
 
 
+async def test_no_bearer_returns_401(validator):
+    """No Authorization header → 401 before the tool is invoked."""
+    middleware = BearerMiddleware(AsyncMock(), validator=validator)
+    request = MagicMock()
+    request.headers = {}
+    call_next = AsyncMock()
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response.status_code == 401
+    body = json.loads(response.body)
+    assert body["error"] == "unauthorized"
+    call_next.assert_not_called()
+
+
+async def test_non_bearer_scheme_returns_401(validator):
+    """Authorization header with wrong scheme → 401."""
+    middleware = BearerMiddleware(AsyncMock(), validator=validator)
+    request = MagicMock()
+    request.headers = {"Authorization": "Basic dXNlcjpwYXNz"}
+    call_next = AsyncMock()
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response.status_code == 401
+    body = json.loads(response.body)
+    assert body["error"] == "unauthorized"
+    call_next.assert_not_called()
+
+
 async def test_expired_jwt_returns_401(validator):
     """Expired JWT → 401 before the tool is invoked."""
-    token = _make_token(exp_offset=-1)  # already expired
+    token = _make_token(exp_offset=-1)
 
     middleware = BearerMiddleware(AsyncMock(), validator=validator)
     request = MagicMock()
@@ -85,7 +114,7 @@ async def test_expired_jwt_returns_401(validator):
 
 
 async def test_invalid_jwt_returns_401(validator):
-    """Malformed / wrong-signature JWT → 401 before the tool is invoked."""
+    """Malformed / wrong-signature JWT → 401."""
     middleware = BearerMiddleware(AsyncMock(), validator=validator)
     request = MagicMock()
     request.headers = {"Authorization": "Bearer not.a.valid.token"}
@@ -114,20 +143,6 @@ async def test_wrong_audience_jwt_returns_401(validator):
     body = json.loads(response.body)
     assert body["error"] == "invalid_token"
     call_next.assert_not_called()
-
-
-async def test_no_bearer_passes_through(validator):
-    """No Authorization header → middleware passes through to next handler."""
-    mock_response = MagicMock()
-    middleware = BearerMiddleware(AsyncMock(), validator=validator)
-    request = MagicMock()
-    request.headers = {}
-    call_next = AsyncMock(return_value=mock_response)
-
-    response = await middleware.dispatch(request, call_next)
-
-    assert response is mock_response
-    call_next.assert_called_once_with(request)
 
 
 async def test_valid_jwt_sets_context_var_and_passes_through(validator):
@@ -172,11 +187,11 @@ async def test_option_a_multi_audience_token_accepted(validator):
     assert captured_key == "ck_from_jwt"
 
 
-# ── Tool dual-auth behavior ────────────────────────────────────────────────────
+# ── Tool auth guard (defensive) ───────────────────────────────────────────────
 
 
 async def test_bearer_token_resolves_consumer_key(anthropic_fn, mock_m):
-    """JWT present → tool works without explicit consumer_api_key parameter."""
+    """JWT → ContextVar → tool billing uses the JWT consumer key."""
     mock_response = MagicMock()
     mock_response.content = [MagicMock(text="JWT auth works")]
 
@@ -184,7 +199,7 @@ async def test_bearer_token_resolves_consumer_key(anthropic_fn, mock_m):
     try:
         with patch("anthropic.AsyncAnthropic") as mock_cls:
             mock_cls.return_value.messages.create = AsyncMock(return_value=mock_response)
-            result = await anthropic_fn("Hello!")  # no consumer_api_key
+            result = await anthropic_fn("Hello!")
 
         assert result == "JWT auth works"
         mock_m._billing.check_balance.assert_called_once_with(
@@ -197,43 +212,13 @@ async def test_bearer_token_resolves_consumer_key(anthropic_fn, mock_m):
         _current_consumer_key.reset(ctx_token)
 
 
-async def test_explicit_param_used_without_jwt(anthropic_fn, mock_m):
-    """No JWT → explicit consumer_api_key parameter works (backwards compat)."""
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="Param auth works")]
+async def test_no_auth_returns_error_string(anthropic_fn, mock_m):
+    """ContextVar=None → tool returns error string, no billing, no crash.
 
-    with patch("anthropic.AsyncAnthropic") as mock_cls:
-        mock_cls.return_value.messages.create = AsyncMock(return_value=mock_response)
-        result = await anthropic_fn("Hello!", consumer_api_key="ck_from_param")
-
-    assert result == "Param auth works"
-    mock_m._billing.check_balance.assert_called_once_with(
-        consumer_api_key="ck_from_param", required=0.000065
-    )
-
-
-async def test_jwt_takes_priority_over_param(anthropic_fn, mock_m):
-    """JWT key overrides consumer_api_key parameter when both are present."""
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="JWT wins")]
-
-    ctx_token = _current_consumer_key.set("ck_from_jwt")
-    try:
-        with patch("anthropic.AsyncAnthropic") as mock_cls:
-            mock_cls.return_value.messages.create = AsyncMock(return_value=mock_response)
-            result = await anthropic_fn("Hello!", consumer_api_key="ck_from_param")
-
-        assert result == "JWT wins"
-        mock_m._billing.check_balance.assert_called_once_with(
-            consumer_api_key="ck_from_jwt", required=0.000065
-        )
-    finally:
-        _current_consumer_key.reset(ctx_token)
-
-
-async def test_no_auth_returns_error_message(anthropic_fn, mock_m):
-    """No JWT + no consumer_api_key → friendly error string, no crash, no charge."""
-    result = await anthropic_fn("Hello!")
+    In production the middleware blocks unauthenticated requests before they
+    reach the tool. This test covers the defensive guard inside the tool itself.
+    """
+    result = await anthropic_fn("Hello!")  # ContextVar is None (default)
 
     assert "Error:" in result
     assert "autenticación" in result

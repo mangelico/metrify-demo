@@ -55,29 +55,23 @@ def register(server, m):
             "openWorldHint": True,
         },
     )
-    async def anthropic_mcp(
-        prompt: str,
-        max_tokens: int = 1024,
-        consumer_api_key: str = "",
-    ) -> str:
+    async def anthropic_mcp(prompt: str, max_tokens: int = 1024) -> str:
         """Generate text using Anthropic claude-haiku-4-5.
 
         Billed at $0.000065 per token via Metrify. The consumer is charged only
-        if the upstream call succeeds.
+        if the upstream call succeeds. Requires OAuth Bearer JWT authentication.
         Demo limits: 2000 char prompt, 512 token response.
 
         Args:
             prompt: Text prompt to send to the model.
             max_tokens: Maximum tokens in the response (default 1024, capped at 512).
-            consumer_api_key: Metrify consumer key (format: ck_...). Optional when
-                using OAuth Bearer JWT — the key is read from the token instead.
 
         Returns:
             Generated text string, or an error message prefixed with "Error:" on failure.
         """
-        resolved_key = _current_consumer_key.get() or consumer_api_key
+        resolved_key = _current_consumer_key.get()
         if not resolved_key:
-            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+            return "Error: sin autenticación"
         return await _billed(
             consumer_api_key=resolved_key,
             prompt=prompt,

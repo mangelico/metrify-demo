@@ -47,29 +47,23 @@ def register(server, m):
             "openWorldHint": True,
         },
     )
-    async def apify_mcp(
-        actor_id: str,
-        run_input: dict,
-        consumer_api_key: str = "",
-    ) -> str:
+    async def apify_mcp(actor_id: str, run_input: dict) -> str:
         """Run an Apify actor and return its dataset results as JSON.
 
-        Billed at $0.005 per call via Metrify. Runs the actor synchronously and
-        waits for completion before returning all dataset items.
+        Billed at $0.005 per call via Metrify. Requires OAuth Bearer JWT
+        authentication. Runs the actor synchronously and waits for completion.
 
         Args:
             actor_id: Apify actor ID or username/actor-name (e.g. "apify/web-scraper").
             run_input: Dictionary of input parameters for the actor.
-            consumer_api_key: Metrify consumer key (format: ck_...). Optional when
-                using OAuth Bearer JWT — the key is read from the token instead.
 
         Returns:
             JSON string of the actor's dataset items, or an error message prefixed
             with "Error:".
         """
-        resolved_key = _current_consumer_key.get() or consumer_api_key
+        resolved_key = _current_consumer_key.get()
         if not resolved_key:
-            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+            return "Error: sin autenticación"
         return await _billed(
             consumer_api_key=resolved_key,
             actor_id=actor_id,

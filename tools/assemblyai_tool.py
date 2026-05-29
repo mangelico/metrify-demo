@@ -75,27 +75,22 @@ def register(server, m):
             "openWorldHint": True,
         },
     )
-    async def assemblyai_mcp(
-        audio_url: str,
-        consumer_api_key: str = "",
-    ) -> str:
+    async def assemblyai_mcp(audio_url: str) -> str:
         """Transcribe audio to text using AssemblyAI.
 
-        Billed at $0.00617 per minute of audio via Metrify. The audio URL must be
-        publicly accessible. Uses AssemblyAI REST API v2 directly.
-        Demo limits: 5 min audio max.
+        Billed at $0.00617 per minute of audio via Metrify. Requires OAuth Bearer
+        JWT authentication. The audio URL must be publicly accessible.
+        Uses AssemblyAI REST API v2 directly. Demo limits: 5 min audio max.
 
         Args:
             audio_url: Publicly accessible URL of the audio file to transcribe.
-            consumer_api_key: Metrify consumer key (format: ck_...). Optional when
-                using OAuth Bearer JWT — the key is read from the token instead.
 
         Returns:
             Transcribed text string, or an error message prefixed with "Error:".
         """
-        resolved_key = _current_consumer_key.get() or consumer_api_key
+        resolved_key = _current_consumer_key.get()
         if not resolved_key:
-            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+            return "Error: sin autenticación"
         return await _billed(
             consumer_api_key=resolved_key,
             audio_url=audio_url,

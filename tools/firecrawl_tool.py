@@ -43,26 +43,21 @@ def register(server, m):
             "openWorldHint": True,
         },
     )
-    async def firecrawl_mcp(
-        url: str,
-        consumer_api_key: str = "",
-    ) -> str:
+    async def firecrawl_mcp(url: str) -> str:
         """Scrape a web page and return its content as clean Markdown.
 
-        Billed at $0.001 per page via Metrify. Uses Firecrawl to extract readable
-        content, stripping navigation, ads, and boilerplate.
+        Billed at $0.001 per page via Metrify. Requires OAuth Bearer JWT
+        authentication. Uses Firecrawl to extract readable content.
 
         Args:
             url: Full URL of the page to scrape (e.g. "https://example.com/article").
-            consumer_api_key: Metrify consumer key (format: ck_...). Optional when
-                using OAuth Bearer JWT — the key is read from the token instead.
 
         Returns:
             Markdown-formatted page content, or an error message prefixed with "Error:".
         """
-        resolved_key = _current_consumer_key.get() or consumer_api_key
+        resolved_key = _current_consumer_key.get()
         if not resolved_key:
-            return "Error: autenticación requerida. Usá OAuth o pasá consumer_api_key."
+            return "Error: sin autenticación"
         return await _billed(
             consumer_api_key=resolved_key,
             url=url,
