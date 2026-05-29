@@ -4,6 +4,7 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from metrify import Metrify
 
 from auth.jwt_validator import JWTValidator
@@ -14,8 +15,26 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ALLOWED_HOSTS: valores permitidos para el Host header (protección DNS rebinding).
+# Railway manda Host: web-production-b51ff.up.railway.app → 421 sin este fix.
+# Env var permite sobreescribir sin tocar código si el dominio cambia.
+_allowed_hosts = [
+    h.strip()
+    for h in os.environ.get(
+        "ALLOWED_HOSTS",
+        "web-production-b51ff.up.railway.app,127.0.0.1:*,localhost:*,[::1]:*",
+    ).split(",")
+    if h.strip()
+]
+
 m = Metrify(mcp_url="https://web-production-b51ff.up.railway.app/mcp")
-server = FastMCP("metrify_demo_mcp")
+server = FastMCP(
+    "metrify_demo_mcp",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=_allowed_hosts,
+    ),
+)
 
 from tools.anthropic_tool import register as register_anthropic
 from tools.openai_tool import register as register_openai
@@ -31,7 +50,7 @@ register_assemblyai(server, m)
 register_apify(server, m)
 register_firecrawl(server, m)
 
-# JWT validator: reads JWT_SECRET and JWT_ISSUER from environment.
+# JWT validator: reads METRIFY_BACKEND_URL and JWT_ISSUER from environment.
 jwt_validator = JWTValidator()
 
 if __name__ == "__main__":
