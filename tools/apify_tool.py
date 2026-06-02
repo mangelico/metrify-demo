@@ -18,7 +18,7 @@ def _handle_error(e: Exception) -> str:
 
 def register(server, m):
     # Inner: billing-wrapped. tool_name="apify" from func.__name__.
-    @m.tool(price=0.005, unit="per_call")
+    @m.tool(price=0.005, unit="per_call", description="Web scraping and automation via Apify. Per run.")
     async def apify(consumer_api_key: str, actor_id: str, run_input: dict) -> str:
         api_token = os.environ["APIFY_API_KEY"]
         loop = asyncio.get_running_loop()

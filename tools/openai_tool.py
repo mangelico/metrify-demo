@@ -19,7 +19,7 @@ def _handle_error(e: Exception) -> str:
 
 def register(server, m):
     # Inner: billing-wrapped. tool_name="openai" from func.__name__.
-    @m.tool(price=0.000010, unit="per_token")
+    @m.tool(price=0.000010, unit="per_token", description="Text generation via GPT-4o-mini (OpenAI). Per token.")
     async def openai(consumer_api_key: str, prompt: str, max_tokens: int = 1024) -> str:
         if len(prompt) > 2000:
             raise UpstreamError(

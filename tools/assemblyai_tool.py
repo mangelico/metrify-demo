@@ -21,7 +21,7 @@ def _handle_error(e: Exception) -> str:
 
 def register(server, m):
     # Inner: billing-wrapped. tool_name="assemblyai" from func.__name__.
-    @m.tool(price=0.00617, unit="per_minute")
+    @m.tool(price=0.00617, unit="per_minute", description="Audio transcription via AssemblyAI. Per minute of audio.")
     async def assemblyai(consumer_api_key: str, audio_url: str) -> str:
         api_key = os.environ["ASSEMBLYAI_API_KEY"]
         headers = {"authorization": api_key, "content-type": "application/json"}

@@ -20,7 +20,7 @@ def _handle_error(e: Exception) -> str:
 
 def register(server, m):
     # Inner: billing-wrapped. tool_name="stability" from func.__name__.
-    @m.tool(price=0.002, unit="per_image")
+    @m.tool(price=0.002, unit="per_image", description="Image generation via Stability AI SDXL. Per image.")
     async def stability(consumer_api_key: str, prompt: str, model: str = "sdxl") -> str:
         api_key = os.environ["STABILITY_API_KEY"]
         try:

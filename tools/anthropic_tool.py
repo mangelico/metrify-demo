@@ -21,7 +21,7 @@ def register(server, m):
     # Inner: billing-wrapped function. consumer_api_key is the first param so
     # the SDK's _extract_consumer_key finds it correctly via positional check.
     # tool_name="anthropic" is derived from func.__name__ by the SDK.
-    @m.tool(price=0.000065, unit="per_token")
+    @m.tool(price=0.000065, unit="per_token", description="Text generation via Claude Haiku (Anthropic). Per token.")
     async def anthropic(consumer_api_key: str, prompt: str, max_tokens: int = 1024) -> str:
         if len(prompt) > 2000:
             raise UpstreamError(

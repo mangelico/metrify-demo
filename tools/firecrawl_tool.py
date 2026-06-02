@@ -17,7 +17,7 @@ def _handle_error(e: Exception) -> str:
 
 def register(server, m):
     # Inner: billing-wrapped. tool_name="firecrawl" from func.__name__.
-    @m.tool(price=0.001, unit="per_page")
+    @m.tool(price=0.001, unit="per_page", description="Web page content extraction to Markdown. Per page.")
     async def firecrawl(consumer_api_key: str, url: str) -> str:
         api_key = os.environ["FIRECRAWL_API_KEY"]
         loop = asyncio.get_running_loop()
