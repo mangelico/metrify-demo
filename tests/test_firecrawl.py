@@ -10,10 +10,10 @@ def firecrawl_fn(mock_server, mock_m):
 
 
 async def test_firecrawl_happy_path(firecrawl_fn, mock_m, with_ck):
-    with patch("tools.firecrawl_tool.FirecrawlApp") as mock_cls:
-        mock_cls.return_value.scrape_url.return_value = {
-            "markdown": "# Page Title\n\nContent here."
-        }
+    with patch("tools.firecrawl_tool.V1FirecrawlApp") as mock_cls:
+        mock_response = MagicMock()
+        mock_response.markdown = "# Page Title\n\nContent here."
+        mock_cls.return_value.scrape_url.return_value = mock_response
         result = await firecrawl_fn("https://example.com")
 
     assert result == "# Page Title\n\nContent here."
@@ -40,7 +40,7 @@ async def test_firecrawl_gateway_error(firecrawl_fn, mock_m, with_ck):
 
 
 async def test_firecrawl_scrape_failure_no_charge(firecrawl_fn, mock_m, with_ck):
-    with patch("tools.firecrawl_tool.FirecrawlApp") as mock_cls:
+    with patch("tools.firecrawl_tool.V1FirecrawlApp") as mock_cls:
         mock_cls.return_value.scrape_url.side_effect = Exception("Firecrawl 403 blocked")
         result = await firecrawl_fn("https://example.com")
 
