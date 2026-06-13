@@ -1,6 +1,6 @@
 import os
 import asyncio
-from firecrawl import FirecrawlApp
+from firecrawl import V1FirecrawlApp
 from metrify import UpstreamError
 from auth.middleware import _current_consumer_key
 
@@ -21,12 +21,12 @@ def register(server, m):
     async def firecrawl(consumer_api_key: str, url: str) -> str:
         api_key = os.environ["FIRECRAWL_API_KEY"]
         loop = asyncio.get_running_loop()
-        app = FirecrawlApp(api_key=api_key)
+        app = V1FirecrawlApp(api_key=api_key)
         try:
             result = await loop.run_in_executor(
-                None, lambda: app.scrape_url(url, {"formats": ["markdown"]})
+                None, lambda: app.scrape_url(url, formats=["markdown"])
             )
-            return result.get("markdown", "")
+            return result.markdown or ""
         except Exception as e:
             raise UpstreamError(_handle_error(e)) from e
 
