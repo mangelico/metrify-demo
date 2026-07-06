@@ -25,7 +25,7 @@
 - [ ] **Fee tiered por volumen** — reducción automática según uso mensual
 - [ ] **Auth dashboard** — login para que cada developer vea solo sus wallets
 - [ ] **Webhook notifications** — alertas cuando balance < threshold
-- [ ] **SDK Python cliente** — `pip install modelo-sdk` para integrar en agentes
+- [ ] **SDK Python cliente** — `pip install metrify-sdk` para integrar en agentes
 
 ## V3 — SDK para MCP Server Developers
 

@@ -1,4 +1,4 @@
-# Deployment Guide — Modelo Gateway
+# Deployment Guide — Metrify Demo
 
 Deploy your own instance on Railway in under 30 minutes.
 
@@ -18,7 +18,7 @@ Deploy your own instance on Railway in under 30 minutes.
 ### 1. Fork the repository
 
 ```
-https://github.com/mangelico/modelo-gateway
+https://github.com/mangelico/metrify-demo
 ```
 
 Fork it to your GitHub account. Keep the repo public or private — Railway works with both.
@@ -133,7 +133,7 @@ Once verified, add this to your Claude Desktop `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "modelo-gateway": {
+    "metrify-demo": {
       "url": "https://YOUR-RAILWAY-URL.up.railway.app/mcp",
       "headers": {
         "X-API-Key": "mk_live_YOUR_KEY"
@@ -150,8 +150,8 @@ Restart Claude Desktop. All 6 tools will appear in the tools panel.
 ## Local development
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/modelo-gateway
-cd modelo-gateway
+git clone https://github.com/YOUR-USERNAME/metrify-demo
+cd metrify-demo
 
 # Install dependencies
 pip install -r requirements.txt

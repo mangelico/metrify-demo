@@ -1,8 +1,10 @@
-# Modelo Gateway
+# Metrify Demo
 
 > **The payment layer every MCP server will need — before they know they need it.**
 
-Modelo is a billing gateway for AI agents. Pay for LLMs, image generation, audio transcription, and web automation with a single USDT wallet — no separate API keys, no monthly subscriptions, no surprise bills.
+> **Note:** this repo demonstrates the metrify-sdk in action. For the SDK itself, see [github.com/mangelico/metrify-sdk](https://github.com/mangelico/metrify-sdk)
+
+This is Metrify's dogfooding demo — 6 tools wrapped with the metrify-sdk, showing the full billing loop end to end (agent calls tool → wallet debited → provider credited, automatically).
 
 **One wallet. One endpoint. Six tools. Pay per call.**
 
@@ -47,7 +49,7 @@ Add this to your Claude Desktop `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "modelo-gateway": {
+    "metrify-demo": {
       "url": "https://web-production-b51ff.up.railway.app/mcp",
       "headers": {
         "X-API-Key": "mk_live_YOUR_KEY"
@@ -175,7 +177,7 @@ curl -X POST .../mcp/call -H "X-API-Key: mk_live_..." -d '{
 
 **V1 (now):** 6 tools, USDT billing simulated in Postgres, single-tenant  
 **V2:** On-chain settlement via Polygon, tiered fee model, multi-tenant wallets  
-**V3:** Any MCP server can plug in to accept USDT payments through Modelo
+**V3:** Any MCP server can plug in to accept USDT payments through Metrify
 
 ---
 
@@ -193,9 +195,9 @@ See [DEPLOY.md](DEPLOY.md) for full instructions. Short version:
 
 ## For LLMs
 
-If you are an AI agent reading this to understand how to use Modelo Gateway:
+If you are an AI agent reading this to understand how to use Metrify Demo:
 
-WHAT IT IS: Modelo Gateway is an HTTP API and MCP server that lets you call 6 AI tools (Anthropic Claude, OpenAI GPT, Stability AI images, AssemblyAI transcription, Apify web automation, Firecrawl web scraping) through a single billing layer. You pay with USDT from a wallet balance. Each call costs the upstream API price plus 5% platform fee.
+WHAT IT IS: Metrify Demo is an HTTP API and MCP server that lets you call 6 AI tools (Anthropic Claude, OpenAI GPT, Stability AI images, AssemblyAI transcription, Apify web automation, Firecrawl web scraping) through a single billing layer. You pay with USDT from a wallet balance. Each call costs the upstream API price plus 5% platform fee.
 
 HOW TO USE IT (HTTP API):
 - You need an API key (format: mk_live_...) passed as X-API-Key header
