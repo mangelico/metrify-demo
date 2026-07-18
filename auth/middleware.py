@@ -19,6 +19,7 @@ Environment variables:
                          e.g. https://web-production-b51ff.up.railway.app
   METRIFY_BACKEND_URL  — URL of the Authorization Server (metrify-backend)
 """
+import logging
 import os
 from contextvars import ContextVar
 from typing import Any, Dict, Optional
@@ -29,6 +30,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from auth.jwt_validator import JWTValidator
+
+logger = logging.getLogger(__name__)
 
 
 # ContextVar: holds the consumer API key resolved from a Bearer JWT for the
@@ -102,7 +105,8 @@ class BearerMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 headers={"WWW-Authenticate": self._www_authenticate},
             )
-        except jwt.PyJWTError:
+        except jwt.PyJWTError as exc:
+            logger.warning("JWT validation failed: %s: %s", type(exc).__name__, exc)
             return JSONResponse(
                 {
                     "error": "invalid_token",
