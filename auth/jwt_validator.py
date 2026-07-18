@@ -71,11 +71,25 @@ class JWTValidator:
         self._resource_url: str = resource_url or _default_resource_url()
         self._public_key: Any = None  # cached after first JWKS fetch
 
-    async def _get_public_key(self) -> Any:
+    async def _get_public_key(
+        self, kid: Optional[str] = None, force_refresh: bool = False
+    ) -> Any:
         """Fetch the RSA public key from the backend JWKS endpoint (cached).
 
-        Fetches {METRIFY_BACKEND_URL}/oauth/jwks.json on first call,
-        parses the first RSA key with RSAAlgorithm.from_jwk(), and caches it.
+        Fetches {METRIFY_BACKEND_URL}/oauth/jwks.json on first call (or when
+        force_refresh=True), selects the key matching `kid` when given
+        (falls back to the first key otherwise — fine for single-key
+        deployments), and caches the result.
+
+        Args:
+            kid: `kid` header from the token being validated, used to pick
+                the matching JWKS entry so key rotation with multiple
+                published keys resolves to the right one.
+            force_refresh: bypass the cache and re-fetch even if a key is
+                already cached. Used to recover from a backend key rotation:
+                without this, a process that cached the old key at startup
+                would reject every token signed with the new key until it
+                was restarted.
 
         Returns:
             RSA public key object usable by PyJWT.
@@ -84,7 +98,7 @@ class JWTValidator:
             httpx.HTTPError: JWKS endpoint unreachable or returned an error.
             KeyError / ValueError: JWKS response is malformed.
         """
-        if self._public_key is not None:
+        if self._public_key is not None and not force_refresh:
             return self._public_key
 
         url = f"{self._backend_url}{JWKS_PATH}"
@@ -93,9 +107,8 @@ class JWTValidator:
             resp.raise_for_status()
             jwks = resp.json()
 
-        # Use the first RSA key in the set.
-        # V2: match by `kid` header in the incoming token for key rotation support.
-        key_data = jwks["keys"][0]
+        keys = jwks["keys"]
+        key_data = next((k for k in keys if k.get("kid") == kid), keys[0]) if kid else keys[0]
         self._public_key = RSAAlgorithm.from_jwk(json.dumps(key_data))
         return self._public_key
 
@@ -112,7 +125,8 @@ class JWTValidator:
             jwt.ExpiredSignatureError: Token has expired.
             jwt.PyJWTError: Token is invalid (bad signature, wrong audience, etc.).
         """
-        public_key = await self._get_public_key()
+        kid = jwt.get_unverified_header(token).get("kid")
+        public_key = await self._get_public_key(kid=kid)
 
         decode_kwargs: Dict[str, Any] = {
             "algorithms": ["RS256"],
@@ -121,5 +135,12 @@ class JWTValidator:
         if self._issuer:
             decode_kwargs["issuer"] = self._issuer
 
-        payload: Dict[str, Any] = jwt.decode(token, public_key, **decode_kwargs)
-        return payload
+        try:
+            return jwt.decode(token, public_key, **decode_kwargs)
+        except jwt.InvalidSignatureError:
+            # Cached key may be stale after a backend key rotation — refetch
+            # once and retry before giving up. Any other failure (expired,
+            # wrong audience, malformed) is a real rejection, not a caching
+            # problem, so only this specific exception triggers a refetch.
+            public_key = await self._get_public_key(kid=kid, force_refresh=True)
+            return jwt.decode(token, public_key, **decode_kwargs)
