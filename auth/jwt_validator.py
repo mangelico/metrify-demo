@@ -16,6 +16,12 @@ Environment variables:
     METRIFY_BACKEND_URL  — base URL of metrify-backend
                            (e.g. https://airy-wholeness-production-fcc4.up.railway.app)
     JWT_ISSUER           — expected issuer claim (optional; skipped if not set)
+    MCP_BASE_URL         — public base URL of THIS server (no trailing slash).
+                           Tokens must carry this server's own resource URL
+                           (MCP_BASE_URL + "/mcp") in their "aud" claim — this
+                           is the same value BearerMiddleware publishes as
+                           "resource" in the RFC 9728 metadata endpoint, so
+                           both must stay derived from the same env var.
 """
 import json
 import os
@@ -26,11 +32,14 @@ import jwt
 from jwt.algorithms import RSAAlgorithm
 
 
-# Audience expected in every token issued by metrify-backend.
-THIS_AUDIENCE = "metrify"
-
 # JWKS path relative to METRIFY_BACKEND_URL.
 JWKS_PATH = "/oauth/jwks.json"
+
+
+def _default_resource_url() -> str:
+    """This server's own resource identifier — matches middleware.py's RFC 9728 'resource'."""
+    base = os.environ.get("MCP_BASE_URL", "http://localhost:8000").rstrip("/")
+    return f"{base}/mcp"
 
 
 class JWTValidator:
@@ -53,11 +62,13 @@ class JWTValidator:
         self,
         backend_url: Optional[str] = None,
         issuer: Optional[str] = None,
+        resource_url: Optional[str] = None,
     ) -> None:
         self._backend_url: str = (
             backend_url or os.environ.get("METRIFY_BACKEND_URL", "")
         ).rstrip("/")
         self._issuer: Optional[str] = issuer or os.environ.get("JWT_ISSUER") or None
+        self._resource_url: str = resource_url or _default_resource_url()
         self._public_key: Any = None  # cached after first JWKS fetch
 
     async def _get_public_key(self) -> Any:
@@ -105,7 +116,7 @@ class JWTValidator:
 
         decode_kwargs: Dict[str, Any] = {
             "algorithms": ["RS256"],
-            "audience": THIS_AUDIENCE,
+            "audience": self._resource_url,
         }
         if self._issuer:
             decode_kwargs["issuer"] = self._issuer

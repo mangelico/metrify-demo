@@ -35,11 +35,15 @@ _PRIVATE_KEY = rsa.generate_private_key(
 _PUBLIC_KEY = _PRIVATE_KEY.public_key()
 _ISSUER = "metrify-backend"
 
+# Matches MCP_BASE_URL set in conftest.py — the audience a real token must
+# carry to be accepted for this server's own resource (RFC 8707 / 9728).
+_RESOURCE = "https://web-production-b51ff.up.railway.app/mcp"
+
 
 def _make_token(
     sub: str = "ck_from_jwt",
     exp_offset: int = 3600,
-    aud="metrify",
+    aud=_RESOURCE,
 ) -> str:
     """Mint a test JWT signed with the module-level RSA private key."""
     payload = {
@@ -227,8 +231,8 @@ async def test_valid_jwt_sets_context_var_and_passes_through(middleware):
 
 
 async def test_option_a_multi_audience_token_accepted(middleware):
-    """Option A: token with aud=[metrify, metrify-mcp] is accepted."""
-    token = _make_token(aud=["metrify", "metrify-mcp"])
+    """Option A: token with aud=[this resource, other-mcp-server] is accepted."""
+    token = _make_token(aud=[_RESOURCE, "metrify-mcp"])
     mock_response = MagicMock()
 
     request = MagicMock()
