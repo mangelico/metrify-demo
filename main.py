@@ -15,19 +15,24 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# MCP_BASE_URL: public URL of THIS server (see .env.example). Drives both the
+# DNS-rebinding allowlist and the Metrify SDK registration URL below, so a
+# domain change (e.g. custom domain) only requires updating the env var.
+_mcp_base_url = os.environ.get("MCP_BASE_URL", "https://web-production-b51ff.up.railway.app").rstrip("/")
+_mcp_base_host = _mcp_base_url.split("://", 1)[-1]
+
 # ALLOWED_HOSTS: valores permitidos para el Host header (protección DNS rebinding).
-# Railway manda Host: web-production-b51ff.up.railway.app → 421 sin este fix.
 # Env var permite sobreescribir sin tocar código si el dominio cambia.
 _allowed_hosts = [
     h.strip()
     for h in os.environ.get(
         "ALLOWED_HOSTS",
-        "web-production-b51ff.up.railway.app,127.0.0.1:*,localhost:*,[::1]:*",
+        f"{_mcp_base_host},127.0.0.1:*,localhost:*,[::1]:*",
     ).split(",")
     if h.strip()
 ]
 
-m = Metrify(mcp_url="https://web-production-b51ff.up.railway.app/mcp")
+m = Metrify(mcp_url=f"{_mcp_base_url}/mcp")
 server = FastMCP(
     "metrify_demo_mcp",
     transport_security=TransportSecuritySettings(
