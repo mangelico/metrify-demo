@@ -77,9 +77,22 @@ class JWTValidator:
         """Fetch the RSA public key from the backend JWKS endpoint (cached).
 
         Fetches {METRIFY_BACKEND_URL}/oauth/jwks.json on first call (or when
-        force_refresh=True), selects the key matching `kid` when given
-        (falls back to the first key otherwise — fine for single-key
-        deployments), and caches the result.
+        force_refresh=True), selects the key matching `kid`, and caches the
+        result.
+
+        Selection rules:
+          - kid given, matches a published key -> that key.
+          - kid given, matches nothing -> rejected. We have no key that
+            could possibly verify this token, so we don't silently fall
+            back to a different one -- this matters once the JWKS ever
+            carries more than one key (e.g. during a rotation).
+          - kid absent, exactly one key published -> that key. Unambiguous:
+            there's no other candidate it could be. This is the one case
+            the previous unconditional "fall back to the first key" was
+            actually justified for (single-key deployments), so it's kept.
+          - kid absent, more than one key published -> rejected. With
+            nothing to disambiguate on, guessing keys[0] would reintroduce
+            exactly the problem above.
 
         Args:
             kid: `kid` header from the token being validated, used to pick
@@ -97,6 +110,8 @@ class JWTValidator:
         Raises:
             httpx.HTTPError: JWKS endpoint unreachable or returned an error.
             KeyError / ValueError: JWKS response is malformed.
+            jwt.InvalidSignatureError: no published key can be identified
+                for this token (see selection rules above).
         """
         if self._public_key is not None and not force_refresh:
             return self._public_key
@@ -108,7 +123,19 @@ class JWTValidator:
             jwks = resp.json()
 
         keys = jwks["keys"]
-        key_data = next((k for k in keys if k.get("kid") == kid), keys[0]) if kid else keys[0]
+        if kid:
+            key_data = next((k for k in keys if k.get("kid") == kid), None)
+            if key_data is None:
+                raise jwt.InvalidSignatureError(
+                    f"No JWKS key found matching kid={kid!r}"
+                )
+        elif len(keys) == 1:
+            key_data = keys[0]
+        else:
+            raise jwt.InvalidSignatureError(
+                "Token has no kid and JWKS publishes multiple keys — "
+                "cannot determine which key to verify against"
+            )
         self._public_key = RSAAlgorithm.from_jwk(json.dumps(key_data))
         return self._public_key
 
