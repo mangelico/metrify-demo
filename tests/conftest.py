@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 os.environ.setdefault("METRIFY_PROVIDER_KEY", "pk_test_xxx")
 os.environ.setdefault("METRIFY_GATEWAY_URL", "http://localhost:9999")
-os.environ.setdefault("MCP_BASE_URL", "https://web-production-b51ff.up.railway.app")
+os.environ.setdefault("MCP_BASE_URL", "https://gateway.metrify.dev")
 os.environ.setdefault("METRIFY_BACKEND_URL", "https://airy-wholeness-production-fcc4.up.railway.app")
 os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-test")
 os.environ.setdefault("OPENAI_API_KEY", "sk-openai-test")
