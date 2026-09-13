@@ -44,7 +44,7 @@ Flujo de cada tool call:
 |---|---|
 | MCP Server | FastMCP (mcp>=1.9.0) |
 | Billing SDK | `metrify/` (local, llama metrify-backend via httpx) |
-| Hosting | Railway — https://web-production-b51ff.up.railway.app |
+| Hosting | Railway — https://gateway.metrify.dev |
 | Tests | pytest + pytest-asyncio, 47 tests |
 
 ---
