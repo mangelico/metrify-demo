@@ -37,7 +37,7 @@ _ISSUER = "metrify-backend"
 
 # Matches MCP_BASE_URL set in conftest.py — the audience a real token must
 # carry to be accepted for this server's own resource (RFC 8707 / 9728).
-_RESOURCE = "https://web-production-b51ff.up.railway.app/mcp"
+_RESOURCE = "https://gateway.metrify.dev/mcp"
 
 
 def _make_token(

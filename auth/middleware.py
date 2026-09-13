@@ -16,7 +16,7 @@ Auth flows:
 
 Environment variables:
   MCP_BASE_URL         — public base URL of this server, no trailing slash
-                         e.g. https://web-production-b51ff.up.railway.app
+                         e.g. https://gateway.metrify.dev
   METRIFY_BACKEND_URL  — URL of the Authorization Server (metrify-backend)
 """
 import logging

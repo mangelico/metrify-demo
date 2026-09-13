@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # MCP_BASE_URL: public URL of THIS server (see .env.example). Drives both the
 # DNS-rebinding allowlist and the Metrify SDK registration URL below, so a
 # domain change (e.g. custom domain) only requires updating the env var.
-_mcp_base_url = os.environ.get("MCP_BASE_URL", "https://web-production-b51ff.up.railway.app").rstrip("/")
+_mcp_base_url = os.environ.get("MCP_BASE_URL", "https://gateway.metrify.dev").rstrip("/")
 _mcp_base_host = _mcp_base_url.split("://", 1)[-1]
 
 # ALLOWED_HOSTS: valores permitidos para el Host header (protección DNS rebinding).
