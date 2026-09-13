@@ -14,7 +14,7 @@ RS256 vs HS256:
 
 Environment variables:
     METRIFY_BACKEND_URL  — base URL of metrify-backend
-                           (e.g. https://airy-wholeness-production-fcc4.up.railway.app)
+                           (e.g. https://api.metrify.dev)
     JWT_ISSUER           — expected issuer claim (optional; skipped if not set)
     MCP_BASE_URL         — public base URL of THIS server (no trailing slash).
                            Tokens must carry this server's own resource URL
