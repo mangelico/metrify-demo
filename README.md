@@ -8,8 +8,8 @@ This is Metrify's dogfooding demo — 6 tools wrapped with the metrify-sdk, show
 
 **One wallet. One endpoint. Six tools. Pay per call.**
 
-🔗 **Production:** https://web-production-b51ff.up.railway.app  
-📊 **Dashboard:** https://web-production-b51ff.up.railway.app/dashboard
+🔗 **Production:** https://gateway.metrify.dev  
+📊 **Dashboard:** https://gateway.metrify.dev/dashboard
 
 ---
 
@@ -19,12 +19,12 @@ This is Metrify's dogfooding demo — 6 tools wrapped with the metrify-sdk, show
 
 **Step 2** — Check your balance
 ```bash
-curl https://web-production-b51ff.up.railway.app/health
+curl https://gateway.metrify.dev/health
 ```
 
 **Step 3** — Call a tool
 ```bash
-curl -X POST https://web-production-b51ff.up.railway.app/mcp/call \
+curl -X POST https://gateway.metrify.dev/mcp/call \
   -H "X-API-Key: mk_live_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -50,7 +50,7 @@ Add this to your Claude Desktop `claude_desktop_config.json`:
 {
   "mcpServers": {
     "metrify-demo": {
-      "url": "https://web-production-b51ff.up.railway.app/mcp",
+      "url": "https://gateway.metrify.dev/mcp",
       "headers": {
         "X-API-Key": "mk_live_YOUR_KEY"
       }
@@ -226,4 +226,4 @@ IMPORTANT RULES:
 - The X-Balance-Remaining header tells you the current wallet balance after each call
 - Top up by calling POST /wallets/{wallet_id}/topup with X-Admin-Token (admin operation)
 
-BASE URL: https://web-production-b51ff.up.railway.app
+BASE URL: https://gateway.metrify.dev
